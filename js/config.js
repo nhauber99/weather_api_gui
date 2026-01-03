@@ -3,6 +3,9 @@ export const ENSEMBLE_DATASET_ID = "ensemble-v1-1h-2500m";
 export const NWP_DATASET_ID = "nwp-v1-1h-2500m";
 export const TIMEZONE = "Europe/Vienna";
 export const OPEN_METEO_BASE = "https://api.open-meteo.com/v1/forecast";
+export const METEOSOURCE_BASE = "https://www.meteosource.com/api/v1/free/point";
+export const OPENWEATHER_BASE = "https://api.openweathermap.org/data/2.5/forecast";
+export const METEOBLUE_BASE = "https://my.meteoblue.com/packages";
 export const DEFAULT_LAT = 47.918608;
 export const DEFAULT_LON = 13.802306;
 

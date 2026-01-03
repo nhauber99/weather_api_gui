@@ -122,29 +122,27 @@ export const createChartBuilder = () => {
 
     const datasets = [
       {
-        label: "P10",
+        label: "C-LAEF P10",
         data: p10,
-        borderColor: "rgba(94, 214, 200, 0.2)",
-        backgroundColor: "rgba(94, 214, 200, 0.12)",
+        borderColor: "#7b6cff",
         pointRadius: 0,
-        borderWidth: 1.5,
+        borderWidth: 1.6,
         tension: 0.35,
+        borderDash: [2, 4],
       },
       {
-        label: "P90",
+        label: "C-LAEF P90",
         data: p90,
-        borderColor: "rgba(94, 214, 200, 0.2)",
-        backgroundColor: "rgba(94, 214, 200, 0.18)",
+        borderColor: "#7b6cff",
         pointRadius: 0,
-        borderWidth: 1.5,
+        borderWidth: 1.6,
         tension: 0.35,
-        fill: "-1",
+        borderDash: [2, 4],
       },
       {
-        label: "P50",
+        label: "C-LAEF P50",
         data: p50,
-        borderColor: "#5ed6c8",
-        backgroundColor: "transparent",
+        borderColor: "#7b6cff",
         pointRadius: 0,
         borderWidth: 2.2,
         tension: 0.35,
@@ -164,7 +162,7 @@ export const createChartBuilder = () => {
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.35,
-        borderDash: item.dash || [6, 4],
+        borderDash: [],
         spanGaps: true,
       });
     });

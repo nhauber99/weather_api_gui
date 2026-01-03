@@ -1,4 +1,14 @@
-﻿import { API_BASE, OPEN_METEO_BASE, TIMEZONE } from "./config.js";
+import {
+  API_BASE,
+  OPEN_METEO_BASE,
+  METEOSOURCE_BASE,
+  OPENWEATHER_BASE,
+  METEOBLUE_BASE,
+  TIMEZONE,
+} from "./config.js";
+import { METEOSOURCE_KEY } from "./meteosource-key.js";
+import { OPENWEATHER_KEY } from "./openweather-key.js";
+import { METEOBLUE_KEY } from "./meteoblue-key.js";
 
 export const buildParamIndex = (metadata) => {
   if (!metadata?.parameters?.length) {
@@ -197,6 +207,257 @@ export const fetchOpenMeteo = async (lat, lon) => {
   return response.json();
 };
 
+const toNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+export const fetchMeteosource = async (lat, lon) => {
+  if (!METEOSOURCE_KEY) {
+    throw new Error("Missing Meteosource API key.");
+  }
+
+  const query = new URLSearchParams({
+    lat: lat.toString(),
+    lon: lon.toString(),
+    sections: "hourly",
+    timezone: TIMEZONE,
+    language: "en",
+    units: "metric",
+    key: METEOSOURCE_KEY,
+  });
+
+  const response = await fetch(`${METEOSOURCE_BASE}?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Meteosource request failed (${response.status}).`);
+  }
+  return response.json();
+};
+
+export const parseMeteosourceHourly = (meteosourceData) => {
+  const hourly = meteosourceData?.hourly?.data || [];
+  const times = [];
+  const temp = [];
+  const precip = [];
+  const wind = [];
+  const cloud = [];
+
+  hourly.forEach((entry) => {
+    times.push(entry?.date || "");
+    temp.push(toNumber(entry?.temperature));
+    precip.push(toNumber(entry?.precipitation?.total));
+    wind.push(toNumber(entry?.wind?.speed));
+    cloud.push(toNumber(entry?.cloud_cover?.total));
+  });
+
+  return { times, temp, precip, wind, cloud };
+};
+
+export const fetchOpenWeather = async (lat, lon) => {
+  if (!OPENWEATHER_KEY) {
+    throw new Error("Missing OpenWeather API key.");
+  }
+
+  const query = new URLSearchParams({
+    lat: lat.toString(),
+    lon: lon.toString(),
+    units: "metric",
+    appid: OPENWEATHER_KEY,
+  });
+
+  const response = await fetch(`${OPENWEATHER_BASE}?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error(`OpenWeather request failed (${response.status}).`);
+  }
+  return response.json();
+};
+
+export const parseOpenWeatherHourly = (openWeatherData) => {
+  const hourly = openWeatherData?.list || [];
+  const baseTimes = [];
+  const baseTemp = [];
+  const basePrecip = [];
+  const baseWind = [];
+  const baseCloud = [];
+
+  hourly.forEach((entry) => {
+    const epoch = Number(entry?.dt);
+    if (!Number.isFinite(epoch)) {
+      return;
+    }
+    baseTimes.push(epoch);
+    baseTemp.push(toNumber(entry?.main?.temp));
+    baseWind.push(toNumber(entry?.wind?.speed));
+    baseCloud.push(toNumber(entry?.clouds?.all));
+
+    const rain = toNumber(entry?.rain?.["3h"]);
+    const snow = toNumber(entry?.snow?.["3h"]);
+    if (rain === null && snow === null) {
+      basePrecip.push(null);
+    } else {
+      basePrecip.push((rain ?? 0) + (snow ?? 0));
+    }
+  });
+
+  if (baseTimes.length < 2) {
+    return {
+      times: baseTimes,
+      temp: baseTemp,
+      precip: basePrecip,
+      wind: baseWind,
+      cloud: baseCloud,
+    };
+  }
+
+  const buildHourlyTimes = (start, end) => {
+    const times = [];
+    for (let t = start; t <= end; t += 3600) {
+      times.push(t);
+    }
+    return times;
+  };
+
+  const interpolateSeries = (times, values, hourlyTimes) => {
+    const results = [];
+    let index = 0;
+    const lastIndex = times.length - 1;
+
+    hourlyTimes.forEach((t) => {
+      if (t < times[0] || t > times[lastIndex]) {
+        results.push(null);
+        return;
+      }
+
+      while (index < lastIndex && times[index + 1] < t) {
+        index += 1;
+      }
+
+      const t0 = times[index];
+      const v0 = values[index];
+      if (t === t0 || index === lastIndex) {
+        results.push(v0 ?? null);
+        return;
+      }
+
+      const t1 = times[index + 1];
+      const v1 = values[index + 1];
+      if (!Number.isFinite(v0) || !Number.isFinite(v1)) {
+        results.push(null);
+        return;
+      }
+
+      const fraction = (t - t0) / (t1 - t0);
+      results.push(v0 + (v1 - v0) * fraction);
+    });
+
+    return results;
+  };
+
+  const buildRates = (times, totals) =>
+    totals.map((value, idx) => {
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+      let stepHours = 3;
+      if (idx < times.length - 1) {
+        stepHours = Math.max(
+          1,
+          Math.round((times[idx + 1] - times[idx]) / 3600)
+        );
+      } else if (idx > 0) {
+        stepHours = Math.max(
+          1,
+          Math.round((times[idx] - times[idx - 1]) / 3600)
+        );
+      }
+      return value / stepHours;
+    });
+
+  const hourlyTimes = buildHourlyTimes(
+    baseTimes[0],
+    baseTimes[baseTimes.length - 1]
+  );
+  const hourlyTemp = interpolateSeries(baseTimes, baseTemp, hourlyTimes);
+  const hourlyWind = interpolateSeries(baseTimes, baseWind, hourlyTimes);
+  const hourlyCloud = interpolateSeries(baseTimes, baseCloud, hourlyTimes);
+  const hourlyPrecip = interpolateSeries(
+    baseTimes,
+    buildRates(baseTimes, basePrecip),
+    hourlyTimes
+  );
+
+  return {
+    times: hourlyTimes,
+    temp: hourlyTemp,
+    precip: hourlyPrecip,
+    wind: hourlyWind,
+    cloud: hourlyCloud,
+  };
+};
+
+const toMeteoblueHourKey = (timeValue) => {
+  if (!timeValue) {
+    return "";
+  }
+  if (timeValue.includes("T")) {
+    return `${timeValue.slice(0, 13)}:00`;
+  }
+  const [date, time] = timeValue.split(" ");
+  if (!date || !time) {
+    return "";
+  }
+  const hour = time.slice(0, 2);
+  return `${date}T${hour}:00`;
+};
+
+export const fetchMeteoblue = async (lat, lon) => {
+  if (!METEOBLUE_KEY) {
+    throw new Error("Missing Meteoblue API key.");
+  }
+
+  const query = new URLSearchParams({
+    lat: lat.toString(),
+    lon: lon.toString(),
+    apikey: METEOBLUE_KEY,
+    tz: TIMEZONE,
+    temperature: "C",
+    windspeed: "ms-1",
+    precipitationamount: "mm",
+  });
+
+  const response = await fetch(
+    `${METEOBLUE_BASE}/basic-1h_clouds-1h?${query.toString()}`
+  );
+  if (!response.ok) {
+    throw new Error(`Meteoblue request failed (${response.status}).`);
+  }
+  return response.json();
+};
+
+export const parseMeteoblueHourly = (meteoblueData) => {
+  const payload = meteoblueData?.data_1h || meteoblueData || {};
+  const times = payload.time || [];
+  const hourKeys = times.map(toMeteoblueHourKey);
+  const temp = (payload.temperature || []).map(toNumber);
+  const precip = (payload.precipitation || []).map(toNumber);
+  const wind = (payload.windspeed || []).map(toNumber);
+  const cloud = (
+    payload.totalcloudcover ||
+    payload.cloudcover ||
+    payload.clouds ||
+    []
+  ).map(toNumber);
+
+  return {
+    times,
+    hourKeys,
+    temp,
+    precip,
+    wind,
+    cloud,
+  };
+};
+
 export const alignSeries = (targetTimestamps, sourceTimestamps, sourceValues) => {
   const map = new Map();
   sourceTimestamps.forEach((ts, idx) => {
@@ -234,3 +495,4 @@ export const toHourlyFromAccum = (accSeries) => {
   }
   return hourly;
 };
+

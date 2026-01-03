@@ -1,6 +1,6 @@
 ﻿# Weather Viewer (Traun, AT)
 
-Static site for visualizing Geosphere Austria ensemble forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with NWP and Open-Meteo overlays on all charts. Includes day/night and moonrise/moonset bands under the x-axis.
+Static site for visualizing Geosphere Austria ensemble forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with NWP, Open-Meteo, Meteosource, OpenWeather, and Meteoblue overlays on all charts. Includes day/night and moonrise/moonset bands under the x-axis.
 
 ## Local run
 
@@ -28,6 +28,10 @@ Then open `http://localhost:8000`.
 
 - The search box uses OpenStreetMap Nominatim (Austria only).
 - Moonrise/set uses a small time offset (`MOON_TIME_OFFSET_MIN` in `js/config.js`) to match observed timings.
+- Meteosource requires a key in `js/meteosource-key.js` (ignored via `.gitignore`).
+- OpenWeather uses the free 3-hourly forecast endpoint and requires a key in `js/openweather-key.js` (ignored via `.gitignore`).
+- Meteoblue uses the basic-1h + clouds-1h package and requires a key in `js/meteoblue-key.js` (ignored via `.gitignore`).
+- Overlay providers are optional; if a provider fails the charts still render with available data.
 
 ## Quick tweaks
 
