@@ -8,6 +8,7 @@
 import {
   formatTime,
   formatNumber,
+  formatLocalHourKey,
   seriesMax,
   toPercent,
 } from "./format.js";
@@ -23,7 +24,9 @@ import {
   buildWindSpeedDeterministic,
   fetchForecast,
   fetchForecastDeterministic,
+  fetchOpenMeteo,
   alignSeries,
+  alignSeriesByKey,
   toHourlyFromAccum,
 } from "./data.js";
 import { createChartBuilder } from "./charts.js";
@@ -46,6 +49,12 @@ const NWP_OVERLAY = {
   label: "NWP",
   color: "#f08a4b",
   dash: [6, 4],
+};
+
+const OPEN_METEO_OVERLAY = {
+  label: "Open-Meteo",
+  color: "#6aa6ff",
+  dash: [3, 4],
 };
 
 let paramSets = null;
@@ -81,15 +90,12 @@ const { setCityStatus } = initCitySearch({
 const toPercentNullable = (value) =>
   value === null || value === undefined ? null : toPercent(value);
 
-const toFixedNullable = (value, digits) =>
-  value === null || value === undefined ? null : Number(value).toFixed(digits);
-
 const loadData = async () => {
   setCityStatus("Fetching forecast...");
   updateLocationLabels();
 
   try {
-    const [ensembleData, nwpData] = await Promise.all([
+    const [ensembleData, nwpData, openMeteoData] = await Promise.all([
       fetchForecast(currentLat, currentLon, ENSEMBLE_DATASET_ID, paramSets.ensemble),
       fetchForecastDeterministic(
         currentLat,
@@ -97,6 +103,7 @@ const loadData = async () => {
         NWP_DATASET_ID,
         paramSets.nwp
       ),
+      fetchOpenMeteo(currentLat, currentLon),
     ]);
 
     const ensembleFeature = ensembleData.features?.[0];
@@ -110,6 +117,13 @@ const loadData = async () => {
     const nwpFeature = nwpData.features?.[0];
     const nwpParams = nwpFeature?.properties?.parameters || {};
     const nwpTimestamps = nwpData.timestamps || [];
+
+    const openMeteoHourly = openMeteoData.hourly || {};
+    const openMeteoTimes = openMeteoHourly.time || [];
+    const openMeteoCloud = openMeteoHourly.cloud_cover || [];
+    const openMeteoTemp = openMeteoHourly.temperature_2m || [];
+    const openMeteoPrecip = openMeteoHourly.precipitation || [];
+    const openMeteoWind = openMeteoHourly.wind_speed_10m || [];
 
     const labels = timestamps;
     const dayNightBand = buildBandData(
@@ -157,6 +171,31 @@ const loadData = async () => {
     const nwpPrecipAligned = alignSeries(timestamps, nwpTimestamps, nwpPrecip);
     const nwpWindAligned = alignSeries(timestamps, nwpTimestamps, nwpWind);
 
+    const openMeteoTempAligned = alignSeriesByKey(
+      timestamps,
+      formatLocalHourKey,
+      openMeteoTimes,
+      openMeteoTemp
+    );
+    const openMeteoCloudAligned = alignSeriesByKey(
+      timestamps,
+      formatLocalHourKey,
+      openMeteoTimes,
+      openMeteoCloud
+    );
+    const openMeteoPrecipAligned = alignSeriesByKey(
+      timestamps,
+      formatLocalHourKey,
+      openMeteoTimes,
+      openMeteoPrecip
+    );
+    const openMeteoWindAligned = alignSeriesByKey(
+      timestamps,
+      formatLocalHourKey,
+      openMeteoTimes,
+      openMeteoWind
+    );
+
     const p10Pct = cloudSeries.p10.map(toPercent);
     const p50Pct = cloudSeries.p50.map(toPercent);
     const p90Pct = cloudSeries.p90.map(toPercent);
@@ -175,7 +214,10 @@ const loadData = async () => {
       suggestedMin: 0,
       suggestedMax: 100,
       formatValue: (value) => `${formatNumber(value, 0)}%`,
-      overlay: { ...NWP_OVERLAY, data: nwpCloudAligned },
+      overlays: [
+        { ...NWP_OVERLAY, data: nwpCloudAligned },
+        { ...OPEN_METEO_OVERLAY, data: openMeteoCloudAligned },
+      ],
     });
 
     if (precipSeries?.p50.length) {
@@ -183,7 +225,8 @@ const loadData = async () => {
         precipSeries.p10,
         precipSeries.p50,
         precipSeries.p90,
-        nwpPrecipAligned.filter((value) => value !== null)
+        nwpPrecipAligned.filter((value) => value !== null),
+        openMeteoPrecipAligned.filter((value) => value !== null)
       );
       buildBandChart({
         canvas: precipCanvas,
@@ -199,7 +242,10 @@ const loadData = async () => {
         suggestedMin: 0,
         suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
         formatValue: (value) => formatNumber(value, 2),
-        overlay: { ...NWP_OVERLAY, data: nwpPrecipAligned },
+        overlays: [
+          { ...NWP_OVERLAY, data: nwpPrecipAligned },
+          { ...OPEN_METEO_OVERLAY, data: openMeteoPrecipAligned },
+        ],
       });
     }
 
@@ -216,7 +262,10 @@ const loadData = async () => {
         yLabel: "Temperature",
         yUnit: "deg C",
         formatValue: (value) => formatNumber(value, 1),
-        overlay: { ...NWP_OVERLAY, data: nwpTempAligned },
+        overlays: [
+          { ...NWP_OVERLAY, data: nwpTempAligned },
+          { ...OPEN_METEO_OVERLAY, data: openMeteoTempAligned },
+        ],
       });
     }
 
@@ -225,7 +274,8 @@ const loadData = async () => {
         windSeries.p10,
         windSeries.p50,
         windSeries.p90,
-        nwpWindAligned.filter((value) => value !== null)
+        nwpWindAligned.filter((value) => value !== null),
+        openMeteoWindAligned.filter((value) => value !== null)
       );
       buildBandChart({
         canvas: windCanvas,
@@ -241,7 +291,10 @@ const loadData = async () => {
         suggestedMin: 0,
         suggestedMax: windMax ? Math.max(5, windMax) : 5,
         formatValue: (value) => formatNumber(value, 1),
-        overlay: { ...NWP_OVERLAY, data: nwpWindAligned },
+        overlays: [
+          { ...NWP_OVERLAY, data: nwpWindAligned },
+          { ...OPEN_METEO_OVERLAY, data: openMeteoWindAligned },
+        ],
       });
     }
 

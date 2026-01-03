@@ -1,4 +1,4 @@
-﻿import { API_BASE } from "./config.js";
+﻿import { API_BASE, OPEN_METEO_BASE, TIMEZONE } from "./config.js";
 
 export const buildParamIndex = (metadata) => {
   if (!metadata?.parameters?.length) {
@@ -180,12 +180,45 @@ export const fetchForecastDeterministic = async (lat, lon, datasetId, params) =>
   return response.json();
 };
 
+export const fetchOpenMeteo = async (lat, lon) => {
+  const query = new URLSearchParams({
+    latitude: lat.toString(),
+    longitude: lon.toString(),
+    hourly: "temperature_2m,precipitation,wind_speed_10m,cloud_cover",
+    forecast_days: "3",
+    wind_speed_unit: "ms",
+    timezone: TIMEZONE,
+  });
+
+  const response = await fetch(`${OPEN_METEO_BASE}?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Open-Meteo request failed (${response.status}).`);
+  }
+  return response.json();
+};
+
 export const alignSeries = (targetTimestamps, sourceTimestamps, sourceValues) => {
   const map = new Map();
   sourceTimestamps.forEach((ts, idx) => {
     map.set(ts, sourceValues[idx]);
   });
   return targetTimestamps.map((ts) => (map.has(ts) ? map.get(ts) : null));
+};
+
+export const alignSeriesByKey = (
+  targetTimestamps,
+  targetKeyFn,
+  sourceKeys,
+  sourceValues
+) => {
+  const map = new Map();
+  sourceKeys.forEach((key, idx) => {
+    map.set(key, sourceValues[idx]);
+  });
+  return targetTimestamps.map((ts) => {
+    const key = targetKeyFn(ts);
+    return map.has(key) ? map.get(key) : null;
+  });
 };
 
 export const toHourlyFromAccum = (accSeries) => {

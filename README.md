@@ -1,6 +1,6 @@
 ﻿# Weather Viewer (Traun, AT)
 
-Static site for visualizing Geosphere Austria ensemble forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with NWP overlays in each chart. Includes day/night and moonrise/moonset bands under the x-axis.
+Static site for visualizing Geosphere Austria ensemble forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with NWP and Open-Meteo overlays on all charts. Includes day/night and moonrise/moonset bands under the x-axis.
 
 ## Local run
 

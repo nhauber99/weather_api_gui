@@ -108,6 +108,7 @@ export const createChartBuilder = () => {
     suggestedMax,
     formatValue,
     overlay,
+    overlays,
   }) => {
     if (!canvas) {
       return;
@@ -150,19 +151,23 @@ export const createChartBuilder = () => {
       },
     ];
 
-    if (overlay?.data) {
+    const overlayItems = overlays || (overlay ? [overlay] : []);
+    overlayItems.forEach((item) => {
+      if (!item?.data) {
+        return;
+      }
       datasets.push({
-        label: overlay.label || "NWP",
-        data: overlay.data,
-        borderColor: overlay.color || "#f08a4b",
+        label: item.label || "NWP",
+        data: item.data,
+        borderColor: item.color || "#f08a4b",
         backgroundColor: "transparent",
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.35,
-        borderDash: overlay.dash || [6, 4],
+        borderDash: item.dash || [6, 4],
         spanGaps: true,
       });
-    }
+    });
 
     const unitSuffix = yUnit ? ` (${yUnit})` : "";
     const valueFormatter = formatValue || ((value) => value);
