@@ -83,6 +83,26 @@ const toPercentNullable = (value) =>
   value === null || value === undefined ? null : toPercent(value);
 
 const toOverlay = (provider, data) => (data ? { provider, data } : null);
+const nonNullSeries = (series) => (series || []).filter((value) => value !== null);
+const emptySeries = () => ({
+  cloud: null,
+  precip: null,
+  temp: null,
+  wind: null,
+});
+const alignProviderSeries = (timestamps, sourceKeys, source) => {
+  if (!source || !sourceKeys?.length) {
+    return emptySeries();
+  }
+  const align = (values) =>
+    alignSeriesByKey(timestamps, formatLocalHourKey, sourceKeys, values);
+  return {
+    cloud: align(source.cloud),
+    precip: align(source.precip),
+    temp: align(source.temp),
+    wind: align(source.wind),
+  };
+};
 
 const loadData = async () => {
   setCityStatus("Fetching forecast...");
@@ -259,137 +279,48 @@ const loadData = async () => {
       ? alignSeries(timestamps, nwpTimestamps, nwpWind)
       : null;
 
-    const openMeteoTempAligned = openMeteoHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openMeteoTimes,
-          openMeteoTemp
-        )
-      : null;
-    const openMeteoCloudAligned = openMeteoHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openMeteoTimes,
-          openMeteoCloud
-        )
-      : null;
-    const openMeteoPrecipAligned = openMeteoHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openMeteoTimes,
-          openMeteoPrecip
-        )
-      : null;
-    const openMeteoWindAligned = openMeteoHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openMeteoTimes,
-          openMeteoWind
-        )
-      : null;
+    const nwpSeries = {
+      cloud: nwpCloudAligned,
+      precip: nwpPrecipAligned,
+      temp: nwpTempAligned,
+      wind: nwpWindAligned,
+    };
 
-    const meteosourceCloudAligned = meteosourceHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteosourceHourKeys,
-          meteosourceHourly.cloud
-        )
-      : null;
-    const meteosourceTempAligned = meteosourceHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteosourceHourKeys,
-          meteosourceHourly.temp
-        )
-      : null;
-    const meteosourcePrecipAligned = meteosourceHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteosourceHourKeys,
-          meteosourceHourly.precip
-        )
-      : null;
-    const meteosourceWindAligned = meteosourceHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteosourceHourKeys,
-          meteosourceHourly.wind
-        )
-      : null;
+    const openMeteoSeries = openMeteoHourly
+      ? alignProviderSeries(timestamps, openMeteoTimes, {
+          cloud: openMeteoCloud,
+          precip: openMeteoPrecip,
+          temp: openMeteoTemp,
+          wind: openMeteoWind,
+        })
+      : emptySeries();
+    const meteosourceSeries = meteosourceHourly
+      ? alignProviderSeries(timestamps, meteosourceHourKeys, meteosourceHourly)
+      : emptySeries();
+    const openWeatherSeries = openWeatherHourly
+      ? alignProviderSeries(timestamps, openWeatherHourKeys, openWeatherHourly)
+      : emptySeries();
+    const meteoblueSeries = meteoblueHourly
+      ? alignProviderSeries(timestamps, meteoblueHourKeys, meteoblueHourly)
+      : emptySeries();
 
-    const openWeatherCloudAligned = openWeatherHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openWeatherHourKeys,
-          openWeatherHourly.cloud
-        )
-      : null;
-    const openWeatherTempAligned = openWeatherHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openWeatherHourKeys,
-          openWeatherHourly.temp
-        )
-      : null;
-    const openWeatherPrecipAligned = openWeatherHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openWeatherHourKeys,
-          openWeatherHourly.precip
-        )
-      : null;
-    const openWeatherWindAligned = openWeatherHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          openWeatherHourKeys,
-          openWeatherHourly.wind
-        )
-      : null;
+    const providerSeries = {
+      nwp: nwpSeries,
+      "open-meteo": openMeteoSeries,
+      meteosource: meteosourceSeries,
+      openweather: openWeatherSeries,
+      meteoblue: meteoblueSeries,
+    };
 
-    const meteoblueCloudAligned = meteoblueHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteoblueHourKeys,
-          meteoblueHourly.cloud
-        )
-      : null;
-    const meteoblueTempAligned = meteoblueHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteoblueHourKeys,
-          meteoblueHourly.temp
-        )
-      : null;
-    const meteobluePrecipAligned = meteoblueHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteoblueHourKeys,
-          meteoblueHourly.precip
-        )
-      : null;
-    const meteoblueWindAligned = meteoblueHourly
-      ? alignSeriesByKey(
-          timestamps,
-          formatLocalHourKey,
-          meteoblueHourKeys,
-          meteoblueHourly.wind
-        )
-      : null;
+    const overlaysFor = (key) =>
+      Object.entries(providerSeries)
+        .map(([provider, series]) => toOverlay(provider, series[key]))
+        .filter(Boolean);
+
+    const overlayValues = (key) =>
+      Object.values(providerSeries)
+        .map((series) => series[key])
+        .filter((series) => Array.isArray(series));
 
     const p10Pct = cloudSeries.p10.map(toPercent);
     const p50Pct = cloudSeries.p50.map(toPercent);
@@ -409,13 +340,7 @@ const loadData = async () => {
       suggestedMin: 0,
       suggestedMax: 100,
       formatValue: (value) => `${formatNumber(value, 0)}%`,
-      overlays: [
-        toOverlay("nwp", nwpCloudAligned),
-        toOverlay("open-meteo", openMeteoCloudAligned),
-        toOverlay("meteosource", meteosourceCloudAligned),
-        toOverlay("openweather", openWeatherCloudAligned),
-        toOverlay("meteoblue", meteoblueCloudAligned),
-      ].filter(Boolean),
+      overlays: overlaysFor("cloud"),
     });
 
     if (precipSeries?.p50.length) {
@@ -423,11 +348,7 @@ const loadData = async () => {
         precipSeries.p10,
         precipSeries.p50,
         precipSeries.p90,
-        (nwpPrecipAligned || []).filter((value) => value !== null),
-        (openMeteoPrecipAligned || []).filter((value) => value !== null),
-        (meteosourcePrecipAligned || []).filter((value) => value !== null),
-        (openWeatherPrecipAligned || []).filter((value) => value !== null),
-        (meteobluePrecipAligned || []).filter((value) => value !== null)
+        ...overlayValues("precip").map(nonNullSeries)
       );
       buildBandChart({
         canvas: precipCanvas,
@@ -443,13 +364,7 @@ const loadData = async () => {
         suggestedMin: 0,
         suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
         formatValue: (value) => formatNumber(value, 2),
-        overlays: [
-          toOverlay("nwp", nwpPrecipAligned),
-          toOverlay("open-meteo", openMeteoPrecipAligned),
-          toOverlay("meteosource", meteosourcePrecipAligned),
-          toOverlay("openweather", openWeatherPrecipAligned),
-          toOverlay("meteoblue", meteobluePrecipAligned),
-        ].filter(Boolean),
+        overlays: overlaysFor("precip"),
       });
     }
 
@@ -466,13 +381,7 @@ const loadData = async () => {
         yLabel: "Temperature",
         yUnit: "deg C",
         formatValue: (value) => formatNumber(value, 1),
-        overlays: [
-          toOverlay("nwp", nwpTempAligned),
-          toOverlay("open-meteo", openMeteoTempAligned),
-          toOverlay("meteosource", meteosourceTempAligned),
-          toOverlay("openweather", openWeatherTempAligned),
-          toOverlay("meteoblue", meteoblueTempAligned),
-        ].filter(Boolean),
+        overlays: overlaysFor("temp"),
       });
     }
 
@@ -481,11 +390,7 @@ const loadData = async () => {
         windSeries.p10,
         windSeries.p50,
         windSeries.p90,
-        (nwpWindAligned || []).filter((value) => value !== null),
-        (openMeteoWindAligned || []).filter((value) => value !== null),
-        (meteosourceWindAligned || []).filter((value) => value !== null),
-        (openWeatherWindAligned || []).filter((value) => value !== null),
-        (meteoblueWindAligned || []).filter((value) => value !== null)
+        ...overlayValues("wind").map(nonNullSeries)
       );
       buildBandChart({
         canvas: windCanvas,
@@ -501,13 +406,7 @@ const loadData = async () => {
         suggestedMin: 0,
         suggestedMax: windMax ? Math.max(5, windMax) : 5,
         formatValue: (value) => formatNumber(value, 1),
-        overlays: [
-          toOverlay("nwp", nwpWindAligned),
-          toOverlay("open-meteo", openMeteoWindAligned),
-          toOverlay("meteosource", meteosourceWindAligned),
-          toOverlay("openweather", openWeatherWindAligned),
-          toOverlay("meteoblue", meteoblueWindAligned),
-        ].filter(Boolean),
+        overlays: overlaysFor("wind"),
       });
     }
 

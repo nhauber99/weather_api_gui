@@ -138,7 +138,6 @@ export const createChartBuilder = () => {
     suggestedMin,
     suggestedMax,
     formatValue,
-    overlay,
     overlays,
   }) => {
     if (!canvas) {
@@ -183,7 +182,7 @@ export const createChartBuilder = () => {
       },
     ];
 
-    const overlayItems = overlays || (overlay ? [overlay] : []);
+    const overlayItems = overlays || [];
     overlayItems.forEach((item) => {
       if (!item?.data) {
         return;
