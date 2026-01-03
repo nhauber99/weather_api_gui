@@ -6,7 +6,6 @@
   DEFAULT_LON,
 } from "./config.js";
 import {
-  formatTime,
   formatNumber,
   formatLocalHourKey,
   seriesMax,
@@ -47,39 +46,8 @@ const cityForm = document.getElementById("cityForm");
 const cityInput = document.getElementById("cityInput");
 const cityResults = document.getElementById("cityResults");
 const cityStatus = document.getElementById("cityStatus");
-const refTimeEl = document.getElementById("refTime");
 const locationLabelEl = document.getElementById("locationLabel");
 const coordLabelEl = document.getElementById("coordLabel");
-
-const NWP_OVERLAY = {
-  label: "NWP",
-  color: "rgba(240, 138, 75, 1)",
-  dash: [6, 4],
-};
-
-const OPEN_METEO_OVERLAY = {
-  label: "Open-Meteo",
-  color: "rgba(39, 244, 76, 1)",
-  dash: [3, 4],
-};
-
-const METEOSOURCE_OVERLAY = {
-  label: "Meteosource",
-  color: "rgba(216, 40, 232, 1)",
-  dash: [2, 4],
-};
-
-const OPENWEATHER_OVERLAY = {
-  label: "OpenWeather",
-  color: "rgba(246, 71, 71, 1)",
-  dash: [1, 4],
-};
-
-const METEOBLUE_OVERLAY = {
-  label: "Meteoblue",
-  color: "rgba(88, 230, 226, 1)",
-  dash: [4, 3],
-};
 
 let paramSets = null;
 let currentLocationName = "Traun";
@@ -91,7 +59,7 @@ const { buildBandChart } = createChartBuilder();
 const updateLocationLabels = () => {
   locationLabelEl.textContent = currentLocationName;
   if (coordLabelEl) {
-    coordLabelEl.textContent = `${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
+    coordLabelEl.textContent = `${currentLat.toFixed(4)}, ${currentLon.toFixed(4)}`;
   }
 };
 
@@ -113,6 +81,8 @@ const { setCityStatus } = initCitySearch({
 
 const toPercentNullable = (value) =>
   value === null || value === undefined ? null : toPercent(value);
+
+const toOverlay = (provider, data) => (data ? { provider, data } : null);
 
 const loadData = async () => {
   setCityStatus("Fetching forecast...");
@@ -440,12 +410,12 @@ const loadData = async () => {
       suggestedMax: 100,
       formatValue: (value) => `${formatNumber(value, 0)}%`,
       overlays: [
-        { ...NWP_OVERLAY, data: nwpCloudAligned },
-        { ...OPEN_METEO_OVERLAY, data: openMeteoCloudAligned },
-        { ...METEOSOURCE_OVERLAY, data: meteosourceCloudAligned },
-        { ...OPENWEATHER_OVERLAY, data: openWeatherCloudAligned },
-        { ...METEOBLUE_OVERLAY, data: meteoblueCloudAligned },
-      ],
+        toOverlay("nwp", nwpCloudAligned),
+        toOverlay("open-meteo", openMeteoCloudAligned),
+        toOverlay("meteosource", meteosourceCloudAligned),
+        toOverlay("openweather", openWeatherCloudAligned),
+        toOverlay("meteoblue", meteoblueCloudAligned),
+      ].filter(Boolean),
     });
 
     if (precipSeries?.p50.length) {
@@ -474,12 +444,12 @@ const loadData = async () => {
         suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
         formatValue: (value) => formatNumber(value, 2),
         overlays: [
-          { ...NWP_OVERLAY, data: nwpPrecipAligned },
-          { ...OPEN_METEO_OVERLAY, data: openMeteoPrecipAligned },
-          { ...METEOSOURCE_OVERLAY, data: meteosourcePrecipAligned },
-          { ...OPENWEATHER_OVERLAY, data: openWeatherPrecipAligned },
-          { ...METEOBLUE_OVERLAY, data: meteobluePrecipAligned },
-        ],
+          toOverlay("nwp", nwpPrecipAligned),
+          toOverlay("open-meteo", openMeteoPrecipAligned),
+          toOverlay("meteosource", meteosourcePrecipAligned),
+          toOverlay("openweather", openWeatherPrecipAligned),
+          toOverlay("meteoblue", meteobluePrecipAligned),
+        ].filter(Boolean),
       });
     }
 
@@ -497,12 +467,12 @@ const loadData = async () => {
         yUnit: "deg C",
         formatValue: (value) => formatNumber(value, 1),
         overlays: [
-          { ...NWP_OVERLAY, data: nwpTempAligned },
-          { ...OPEN_METEO_OVERLAY, data: openMeteoTempAligned },
-          { ...METEOSOURCE_OVERLAY, data: meteosourceTempAligned },
-          { ...OPENWEATHER_OVERLAY, data: openWeatherTempAligned },
-          { ...METEOBLUE_OVERLAY, data: meteoblueTempAligned },
-        ],
+          toOverlay("nwp", nwpTempAligned),
+          toOverlay("open-meteo", openMeteoTempAligned),
+          toOverlay("meteosource", meteosourceTempAligned),
+          toOverlay("openweather", openWeatherTempAligned),
+          toOverlay("meteoblue", meteoblueTempAligned),
+        ].filter(Boolean),
       });
     }
 
@@ -532,18 +502,14 @@ const loadData = async () => {
         suggestedMax: windMax ? Math.max(5, windMax) : 5,
         formatValue: (value) => formatNumber(value, 1),
         overlays: [
-          { ...NWP_OVERLAY, data: nwpWindAligned },
-          { ...OPEN_METEO_OVERLAY, data: openMeteoWindAligned },
-          { ...METEOSOURCE_OVERLAY, data: meteosourceWindAligned },
-          { ...OPENWEATHER_OVERLAY, data: openWeatherWindAligned },
-          { ...METEOBLUE_OVERLAY, data: meteoblueWindAligned },
-        ],
+          toOverlay("nwp", nwpWindAligned),
+          toOverlay("open-meteo", openMeteoWindAligned),
+          toOverlay("meteosource", meteosourceWindAligned),
+          toOverlay("openweather", openWeatherWindAligned),
+          toOverlay("meteoblue", meteoblueWindAligned),
+        ].filter(Boolean),
       });
     }
-
-    refTimeEl.textContent = ensembleData.reference_time
-      ? formatTime(ensembleData.reference_time)
-      : "N/A";
 
     if (failures.length) {
       setCityStatus(`Updated (missing: ${failures.join(", ")}).`);

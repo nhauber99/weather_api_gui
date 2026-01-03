@@ -1,4 +1,5 @@
-﻿import { formatTime, formatEvenHourTick } from "./format.js";
+import { formatTime, formatEvenHourTick, getLocalHour } from "./format.js";
+import { ENSEMBLE_STYLE, PROVIDER_STYLES } from "./theme.js";
 
 const BAND_HEIGHT = 10;
 const BAND_GAP = 4;
@@ -85,6 +86,36 @@ const dayNightBandPlugin = {
   },
 };
 
+const midnightLinePlugin = {
+  id: "midnightLines",
+  afterDatasetsDraw(chart, _args, options) {
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    const labels = chart.data?.labels || [];
+    if (!xScale || !yScale || !labels.length) {
+      return;
+    }
+
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = options?.color || "rgba(255, 70, 70, 0.85)";
+    ctx.lineWidth = options?.lineWidth || 1.4;
+
+    labels.forEach((label, index) => {
+      if (getLocalHour(label) !== 0) {
+        return;
+      }
+      const x = xScale.getPixelForValue(index);
+      ctx.beginPath();
+      ctx.moveTo(x, yScale.top);
+      ctx.lineTo(x, yScale.bottom);
+      ctx.stroke();
+    });
+
+    ctx.restore();
+  },
+};
+
 export const createChartBuilder = () => {
   const charts = {
     cloud: null,
@@ -122,29 +153,32 @@ export const createChartBuilder = () => {
 
     const datasets = [
       {
-        label: "C-LAEF P10",
+        label: `${ENSEMBLE_STYLE.labelPrefix} P10`,
         data: p10,
-        borderColor: "#7b6cff",
+        borderColor: ENSEMBLE_STYLE.color,
+        backgroundColor: "transparent",
         pointRadius: 0,
-        borderWidth: 1.6,
+        borderWidth: ENSEMBLE_STYLE.widths.p10,
         tension: 0.35,
-        borderDash: [2, 4],
+        borderDash: ENSEMBLE_STYLE.dotDash,
       },
       {
-        label: "C-LAEF P90",
+        label: `${ENSEMBLE_STYLE.labelPrefix} P90`,
         data: p90,
-        borderColor: "#7b6cff",
+        borderColor: ENSEMBLE_STYLE.color,
+        backgroundColor: "transparent",
         pointRadius: 0,
-        borderWidth: 1.6,
+        borderWidth: ENSEMBLE_STYLE.widths.p90,
         tension: 0.35,
-        borderDash: [2, 4],
+        borderDash: ENSEMBLE_STYLE.dotDash,
       },
       {
-        label: "C-LAEF P50",
+        label: `${ENSEMBLE_STYLE.labelPrefix} P50`,
         data: p50,
-        borderColor: "#7b6cff",
+        borderColor: ENSEMBLE_STYLE.color,
+        backgroundColor: "transparent",
         pointRadius: 0,
-        borderWidth: 2.2,
+        borderWidth: ENSEMBLE_STYLE.widths.p50,
         tension: 0.35,
       },
     ];
@@ -154,10 +188,14 @@ export const createChartBuilder = () => {
       if (!item?.data) {
         return;
       }
+      const style = PROVIDER_STYLES[item.provider] || {
+        label: item.provider || "Overlay",
+        color: "#f08a4b",
+      };
       datasets.push({
-        label: item.label || "NWP",
+        label: style.label,
         data: item.data,
-        borderColor: item.color || "#f08a4b",
+        borderColor: style.color,
         backgroundColor: "transparent",
         pointRadius: 0,
         borderWidth: 2,
@@ -172,7 +210,7 @@ export const createChartBuilder = () => {
 
     charts[chartKey] = new Chart(ctx, {
       type: "line",
-      plugins: [dayNightBandPlugin],
+      plugins: [dayNightBandPlugin, midnightLinePlugin],
       data: {
         labels,
         datasets,
@@ -207,6 +245,10 @@ export const createChartBuilder = () => {
             ],
             height: BAND_HEIGHT,
             gap: BAND_GAP,
+          },
+          midnightLines: {
+            color: "rgba(255, 70, 70, 0.85)",
+            lineWidth: 1.4,
           },
           tooltip: {
             callbacks: {
@@ -258,3 +300,7 @@ export const createChartBuilder = () => {
 
   return { buildBandChart };
 };
+
+
+
+
