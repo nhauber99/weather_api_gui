@@ -116,6 +116,97 @@ const midnightLinePlugin = {
   },
 };
 
+const toRgba = (color, alpha) => {
+  if (!color) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+  if (color.startsWith("rgba")) {
+    return color.replace(/rgba\(([^)]+)\)/, (_match, values) => {
+      const parts = values.split(",").map((part) => part.trim());
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+    });
+  }
+  if (color.startsWith("rgb")) {
+    return color.replace("rgb", "rgba").replace(")", `, ${alpha})`);
+  }
+  if (color.startsWith("#")) {
+    let hex = color.slice(1);
+    if (hex.length === 3) {
+      hex = hex
+        .split("")
+        .map((char) => char + char)
+        .join("");
+    }
+    if (hex.length !== 6) {
+      return color;
+    }
+    const r = Number.parseInt(hex.slice(0, 2), 16);
+    const g = Number.parseInt(hex.slice(2, 4), 16);
+    const b = Number.parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+};
+
+const buildSimpleDatasets = (simpleSeries) => {
+  const base = ENSEMBLE_STYLE.color;
+  const softLine = toRgba(base, 0.28);
+  const softFill = toRgba(base, 0.12);
+  const dotted = ENSEMBLE_STYLE.dotDash;
+  const lineWidth = ENSEMBLE_STYLE.widths.p50;
+
+  return [
+    {
+      label: "Min",
+      data: simpleSeries.min,
+      borderColor: toRgba(base, 0.7),
+      backgroundColor: "transparent",
+      pointRadius: 0,
+      borderWidth: 1.4,
+      tension: 0.35,
+      borderDash: dotted,
+    },
+    {
+      label: "Max",
+      data: simpleSeries.max,
+      borderColor: toRgba(base, 0.7),
+      backgroundColor: "transparent",
+      pointRadius: 0,
+      borderWidth: 1.4,
+      tension: 0.35,
+      borderDash: dotted,
+    },
+    {
+      label: "Range low",
+      data: simpleSeries.innerMin,
+      borderColor: softLine,
+      backgroundColor: "transparent",
+      pointRadius: 0,
+      borderWidth: 1.2,
+      tension: 0.35,
+    },
+    {
+      label: "Range high",
+      data: simpleSeries.innerMax,
+      borderColor: softLine,
+      backgroundColor: softFill,
+      pointRadius: 0,
+      borderWidth: 1.2,
+      tension: 0.35,
+      fill: "-1",
+    },
+    {
+      label: "Average",
+      data: simpleSeries.avg,
+      borderColor: base,
+      backgroundColor: "transparent",
+      pointRadius: 0,
+      borderWidth: lineWidth,
+      tension: 0.35,
+    },
+  ];
+};
+
 export const createChartBuilder = () => {
   const charts = {
     cloud: null,
@@ -139,6 +230,8 @@ export const createChartBuilder = () => {
     suggestedMax,
     formatValue,
     overlays,
+    simpleSeries,
+    simpleView = false,
   }) => {
     if (!canvas) {
       return;
@@ -150,59 +243,63 @@ export const createChartBuilder = () => {
       charts[chartKey].destroy();
     }
 
-    const datasets = [
-      {
-        label: `${ENSEMBLE_STYLE.labelPrefix} P10`,
-        data: p10,
-        borderColor: ENSEMBLE_STYLE.color,
-        backgroundColor: "transparent",
-        pointRadius: 0,
-        borderWidth: ENSEMBLE_STYLE.widths.p10,
-        tension: 0.35,
-        borderDash: ENSEMBLE_STYLE.dotDash,
-      },
-      {
-        label: `${ENSEMBLE_STYLE.labelPrefix} P90`,
-        data: p90,
-        borderColor: ENSEMBLE_STYLE.color,
-        backgroundColor: "transparent",
-        pointRadius: 0,
-        borderWidth: ENSEMBLE_STYLE.widths.p90,
-        tension: 0.35,
-        borderDash: ENSEMBLE_STYLE.dotDash,
-      },
-      {
-        label: `${ENSEMBLE_STYLE.labelPrefix} P50`,
-        data: p50,
-        borderColor: ENSEMBLE_STYLE.color,
-        backgroundColor: "transparent",
-        pointRadius: 0,
-        borderWidth: ENSEMBLE_STYLE.widths.p50,
-        tension: 0.35,
-      },
-    ];
+    const datasets = simpleView && simpleSeries
+      ? buildSimpleDatasets(simpleSeries)
+      : [
+          {
+            label: `${ENSEMBLE_STYLE.labelPrefix} P10`,
+            data: p10,
+            borderColor: ENSEMBLE_STYLE.color,
+            backgroundColor: "transparent",
+            pointRadius: 0,
+            borderWidth: ENSEMBLE_STYLE.widths.p10,
+            tension: 0.35,
+            borderDash: ENSEMBLE_STYLE.dotDash,
+          },
+          {
+            label: `${ENSEMBLE_STYLE.labelPrefix} P90`,
+            data: p90,
+            borderColor: ENSEMBLE_STYLE.color,
+            backgroundColor: "transparent",
+            pointRadius: 0,
+            borderWidth: ENSEMBLE_STYLE.widths.p90,
+            tension: 0.35,
+            borderDash: ENSEMBLE_STYLE.dotDash,
+          },
+          {
+            label: `${ENSEMBLE_STYLE.labelPrefix} P50`,
+            data: p50,
+            borderColor: ENSEMBLE_STYLE.color,
+            backgroundColor: "transparent",
+            pointRadius: 0,
+            borderWidth: ENSEMBLE_STYLE.widths.p50,
+            tension: 0.35,
+          },
+        ];
 
-    const overlayItems = overlays || [];
-    overlayItems.forEach((item) => {
-      if (!item?.data) {
-        return;
-      }
-      const style = PROVIDER_STYLES[item.provider] || {
-        label: item.provider || "Overlay",
-        color: "#f08a4b",
-      };
-      datasets.push({
-        label: style.label,
-        data: item.data,
-        borderColor: style.color,
-        backgroundColor: "transparent",
-        pointRadius: 0,
-        borderWidth: 2,
-        tension: 0.35,
-        borderDash: [],
-        spanGaps: true,
+    if (!simpleView) {
+      const overlayItems = overlays || [];
+      overlayItems.forEach((item) => {
+        if (!item?.data) {
+          return;
+        }
+        const style = PROVIDER_STYLES[item.provider] || {
+          label: item.provider || "Overlay",
+          color: "#f08a4b",
+        };
+        datasets.push({
+          label: style.label,
+          data: item.data,
+          borderColor: style.color,
+          backgroundColor: "transparent",
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.35,
+          borderDash: [],
+          spanGaps: true,
+        });
       });
-    });
+    }
 
     const unitSuffix = yUnit ? ` (${yUnit})` : "";
     const valueFormatter = formatValue || ((value) => value);

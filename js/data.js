@@ -6,9 +6,7 @@ import {
   METEOBLUE_BASE,
   TIMEZONE,
 } from "./config.js";
-import { METEOSOURCE_KEY } from "./meteosource-key.js";
-import { OPENWEATHER_KEY } from "./openweather-key.js";
-import { METEOBLUE_KEY } from "./meteoblue-key.js";
+import { METEOSOURCE_KEY, OPENWEATHER_KEY, METEOBLUE_KEY } from "./keys.js";
 
 export const buildParamIndex = (metadata) => {
   if (!metadata?.parameters?.length) {
@@ -214,7 +212,7 @@ const toNumber = (value) => {
 
 export const fetchMeteosource = async (lat, lon) => {
   if (!METEOSOURCE_KEY) {
-    throw new Error("Missing Meteosource API key.");
+    return null;
   }
 
   const query = new URLSearchParams({
@@ -255,7 +253,7 @@ export const parseMeteosourceHourly = (meteosourceData) => {
 
 export const fetchOpenWeather = async (lat, lon) => {
   if (!OPENWEATHER_KEY) {
-    throw new Error("Missing OpenWeather API key.");
+    return null;
   }
 
   const query = new URLSearchParams({
@@ -412,7 +410,7 @@ const toMeteoblueHourKey = (timeValue) => {
 
 export const fetchMeteoblue = async (lat, lon) => {
   if (!METEOBLUE_KEY) {
-    throw new Error("Missing Meteoblue API key.");
+    return null;
   }
 
   const query = new URLSearchParams({

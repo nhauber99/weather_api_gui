@@ -48,13 +48,23 @@ const cityResults = document.getElementById("cityResults");
 const cityStatus = document.getElementById("cityStatus");
 const locationLabelEl = document.getElementById("locationLabel");
 const coordLabelEl = document.getElementById("coordLabel");
+const viewToggle = document.getElementById("viewToggle");
 
 let paramSets = null;
 let currentLocationName = "Traun";
 let currentLat = DEFAULT_LAT;
 let currentLon = DEFAULT_LON;
+let simpleView = false;
+let lastState = null;
 
 const { buildBandChart } = createChartBuilder();
+
+if (viewToggle) {
+  viewToggle.addEventListener("change", () => {
+    simpleView = viewToggle.checked;
+    renderCharts(lastState);
+  });
+}
 
 const updateLocationLabels = () => {
   locationLabelEl.textContent = currentLocationName;
@@ -102,6 +112,157 @@ const alignProviderSeries = (timestamps, sourceKeys, source) => {
     temp: align(source.temp),
     wind: align(source.wind),
   };
+};
+
+const buildSimpleSummary = (seriesList, length) => {
+  const min = [];
+  const max = [];
+  const innerMin = [];
+  const innerMax = [];
+  const avg = [];
+
+  for (let i = 0; i < length; i += 1) {
+    const values = seriesList
+      .map((series) => series?.[i])
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+
+    if (!values.length) {
+      min.push(null);
+      max.push(null);
+      innerMin.push(null);
+      innerMax.push(null);
+      avg.push(null);
+      continue;
+    }
+
+    const first = values[0];
+    const last = values[values.length - 1];
+    min.push(first);
+    max.push(last);
+
+    if (values.length > 2) {
+      const trimmed = values.slice(1, -1);
+      innerMin.push(trimmed[0]);
+      innerMax.push(trimmed[trimmed.length - 1]);
+      avg.push(trimmed.reduce((sum, value) => sum + value, 0) / trimmed.length);
+    } else {
+      innerMin.push(first);
+      innerMax.push(last);
+      avg.push(values.reduce((sum, value) => sum + value, 0) / values.length);
+    }
+  }
+
+  return { min, max, innerMin, innerMax, avg };
+};
+
+const renderCharts = (state) => {
+  if (!state) {
+    return;
+  }
+
+  const {
+    labels,
+    dayNightBand,
+    moonBand,
+    cloudSeries,
+    precipSeries,
+    tempSeries,
+    windSeries,
+    providerSeries,
+    simpleSeries,
+    precipMax,
+    windMax,
+  } = state;
+
+  const overlaysFor = (key) =>
+    Object.entries(providerSeries)
+      .map(([provider, series]) => toOverlay(provider, series[key]))
+      .filter(Boolean);
+
+  const p10Pct = cloudSeries.p10.map(toPercent);
+  const p50Pct = cloudSeries.p50.map(toPercent);
+  const p90Pct = cloudSeries.p90.map(toPercent);
+
+  buildBandChart({
+    canvas: cloudCanvas,
+    chartKey: "cloud",
+    labels,
+    p10: p10Pct,
+    p50: p50Pct,
+    p90: p90Pct,
+    dayNightBand,
+    moonBand,
+    yLabel: "Cloud cover",
+    yUnit: "%",
+    suggestedMin: 0,
+    suggestedMax: 100,
+    formatValue: (value) => `${formatNumber(value, 0)}%`,
+    overlays: overlaysFor("cloud"),
+    simpleSeries: simpleSeries.cloud,
+    simpleView,
+  });
+
+  if (precipSeries?.p50.length) {
+    buildBandChart({
+      canvas: precipCanvas,
+      chartKey: "precip",
+      labels,
+      p10: precipSeries.p10,
+      p50: precipSeries.p50,
+      p90: precipSeries.p90,
+      dayNightBand,
+      moonBand,
+      yLabel: "Precipitation",
+      yUnit: "mm",
+      suggestedMin: 0,
+      suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
+      formatValue: (value) => formatNumber(value, 2),
+      overlays: overlaysFor("precip"),
+      simpleSeries: simpleSeries.precip,
+      simpleView,
+    });
+  }
+
+  if (tempSeries?.p50.length) {
+    buildBandChart({
+      canvas: tempCanvas,
+      chartKey: "temp",
+      labels,
+      p10: tempSeries.p10,
+      p50: tempSeries.p50,
+      p90: tempSeries.p90,
+      dayNightBand,
+      moonBand,
+      yLabel: "Temperature",
+      yUnit: "deg C",
+      formatValue: (value) => formatNumber(value, 1),
+      overlays: overlaysFor("temp"),
+      simpleSeries: simpleSeries.temp,
+      simpleView,
+    });
+  }
+
+  if (windSeries?.p50.length) {
+    buildBandChart({
+      canvas: windCanvas,
+      chartKey: "wind",
+      labels,
+      p10: windSeries.p10,
+      p50: windSeries.p50,
+      p90: windSeries.p90,
+      dayNightBand,
+      moonBand,
+      yLabel: "Wind speed",
+      yUnit: "m/s",
+      suggestedMin: 0,
+      suggestedMax: windMax ? Math.max(5, windMax) : 5,
+      formatValue: (value) => formatNumber(value, 1),
+      overlays: overlaysFor("wind"),
+      simpleSeries: simpleSeries.wind,
+      simpleView,
+    });
+  }
 };
 
 const loadData = async () => {
@@ -312,11 +473,6 @@ const loadData = async () => {
       meteoblue: meteoblueSeries,
     };
 
-    const overlaysFor = (key) =>
-      Object.entries(providerSeries)
-        .map(([provider, series]) => toOverlay(provider, series[key]))
-        .filter(Boolean);
-
     const overlayValues = (key) =>
       Object.values(providerSeries)
         .map((series) => series[key])
@@ -326,89 +482,58 @@ const loadData = async () => {
     const p50Pct = cloudSeries.p50.map(toPercent);
     const p90Pct = cloudSeries.p90.map(toPercent);
 
-    buildBandChart({
-      canvas: cloudCanvas,
-      chartKey: "cloud",
+    const simpleSeries = {
+      cloud: buildSimpleSummary(
+        [p10Pct, p50Pct, p90Pct, ...overlayValues("cloud")],
+        labels.length
+      ),
+      precip: buildSimpleSummary(
+        [
+          precipSeries.p10,
+          precipSeries.p50,
+          precipSeries.p90,
+          ...overlayValues("precip"),
+        ],
+        labels.length
+      ),
+      temp: buildSimpleSummary(
+        [tempSeries.p10, tempSeries.p50, tempSeries.p90, ...overlayValues("temp")],
+        labels.length
+      ),
+      wind: buildSimpleSummary(
+        [windSeries.p10, windSeries.p50, windSeries.p90, ...overlayValues("wind")],
+        labels.length
+      ),
+    };
+
+    const precipMax = seriesMax(
+      precipSeries.p10,
+      precipSeries.p50,
+      precipSeries.p90,
+      ...overlayValues("precip").map(nonNullSeries)
+    );
+    const windMax = seriesMax(
+      windSeries.p10,
+      windSeries.p50,
+      windSeries.p90,
+      ...overlayValues("wind").map(nonNullSeries)
+    );
+
+    lastState = {
       labels,
-      p10: p10Pct,
-      p50: p50Pct,
-      p90: p90Pct,
       dayNightBand,
       moonBand,
-      yLabel: "Cloud cover",
-      yUnit: "%",
-      suggestedMin: 0,
-      suggestedMax: 100,
-      formatValue: (value) => `${formatNumber(value, 0)}%`,
-      overlays: overlaysFor("cloud"),
-    });
+      cloudSeries,
+      precipSeries,
+      tempSeries,
+      windSeries,
+      providerSeries,
+      simpleSeries,
+      precipMax,
+      windMax,
+    };
 
-    if (precipSeries?.p50.length) {
-      const precipMax = seriesMax(
-        precipSeries.p10,
-        precipSeries.p50,
-        precipSeries.p90,
-        ...overlayValues("precip").map(nonNullSeries)
-      );
-      buildBandChart({
-        canvas: precipCanvas,
-        chartKey: "precip",
-        labels,
-        p10: precipSeries.p10,
-        p50: precipSeries.p50,
-        p90: precipSeries.p90,
-        dayNightBand,
-        moonBand,
-        yLabel: "Precipitation",
-        yUnit: "mm",
-        suggestedMin: 0,
-        suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
-        formatValue: (value) => formatNumber(value, 2),
-        overlays: overlaysFor("precip"),
-      });
-    }
-
-    if (tempSeries?.p50.length) {
-      buildBandChart({
-        canvas: tempCanvas,
-        chartKey: "temp",
-        labels,
-        p10: tempSeries.p10,
-        p50: tempSeries.p50,
-        p90: tempSeries.p90,
-        dayNightBand,
-        moonBand,
-        yLabel: "Temperature",
-        yUnit: "deg C",
-        formatValue: (value) => formatNumber(value, 1),
-        overlays: overlaysFor("temp"),
-      });
-    }
-
-    if (windSeries?.p50.length) {
-      const windMax = seriesMax(
-        windSeries.p10,
-        windSeries.p50,
-        windSeries.p90,
-        ...overlayValues("wind").map(nonNullSeries)
-      );
-      buildBandChart({
-        canvas: windCanvas,
-        chartKey: "wind",
-        labels,
-        p10: windSeries.p10,
-        p50: windSeries.p50,
-        p90: windSeries.p90,
-        dayNightBand,
-        moonBand,
-        yLabel: "Wind speed",
-        yUnit: "m/s",
-        suggestedMin: 0,
-        suggestedMax: windMax ? Math.max(5, windMax) : 5,
-        formatValue: (value) => formatNumber(value, 1),
-        overlays: overlaysFor("wind"),
-      });
-    }
+    renderCharts(lastState);
 
     if (failures.length) {
       setCityStatus(`Updated (missing: ${failures.join(", ")}).`);
