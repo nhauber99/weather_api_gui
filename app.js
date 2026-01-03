@@ -66,8 +66,75 @@ const seriesMax = (...series) => {
   }
   return Math.max(...values);
 };
+
+const formatTimeUtc = (iso) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+
+const logBandDebug = (timestamps, lat, lon, dayNightBand, moonBand) => {
+  if (!timestamps.length) {
+    return;
+  }
+
+  const rows = [];
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const startIso = timestamps[i];
+    const endIso = timestamps[i + 1] || "";
+    const dayCross = dayNightBand.crossings[i];
+    const moonCross = moonBand.crossings[i];
+    const startMs = Date.parse(startIso);
+    const endMs = Date.parse(endIso);
+    const dayCrossMs =
+      Number.isFinite(dayCross) && Number.isFinite(startMs) && Number.isFinite(endMs)
+        ? startMs + (endMs - startMs) * dayCross
+        : null;
+    const moonCrossMs =
+      Number.isFinite(moonCross) && Number.isFinite(startMs) && Number.isFinite(endMs)
+        ? startMs + (endMs - startMs) * moonCross
+        : null;
+
+    rows.push({
+      index: i,
+      startLocal: formatTime(startIso),
+      endLocal: endIso ? formatTime(endIso) : "",
+      startUtc: formatTimeUtc(startIso),
+      endUtc: endIso ? formatTimeUtc(endIso) : "",
+      solarElev: formatNumber(dayNightBand.elevations[i], 2),
+      moonElev: formatNumber(moonBand.elevations[i], 2),
+      solarCrossFrac: Number.isFinite(dayCross) ? formatNumber(dayCross, 3) : "",
+      solarCrossLocal: dayCrossMs
+        ? formatTime(new Date(dayCrossMs).toISOString())
+        : "",
+      solarCrossUtc: dayCrossMs
+        ? formatTimeUtc(new Date(dayCrossMs).toISOString())
+        : "",
+      moonCrossFrac: Number.isFinite(moonCross) ? formatNumber(moonCross, 3) : "",
+      moonCrossLocal: moonCrossMs
+        ? formatTime(new Date(moonCrossMs).toISOString())
+        : "",
+      moonCrossUtc: moonCrossMs
+        ? formatTimeUtc(new Date(moonCrossMs).toISOString())
+        : "",
+    });
+  }
+
+  console.groupCollapsed(
+    `Band debug (lat ${lat.toFixed(4)}, lon ${lon.toFixed(4)})`
+  );
+  console.table(rows);
+  console.groupEnd();
+};
 const degToRad = (deg) => (deg * Math.PI) / 180;
 const radToDeg = (rad) => (rad * 180) / Math.PI;
+const RAD = Math.PI / 180;
+const DAY_MS = 86400000;
+const J1970 = 2440588;
+const J2000 = 2451545;
 
 const normalizeDegrees = (deg) => ((deg % 360) + 360) % 360;
 
@@ -135,53 +202,235 @@ const solarElevation = (date, lat, lon) => {
   return 90 - radToDeg(zenith);
 };
 
-const buildDayNightSegments = (timestamps, lat, lon) =>
-  timestamps.map((iso) => solarElevation(new Date(iso), lat, lon) > 0);
+const toJulian = (date) => date.getTime() / DAY_MS - 0.5 + J1970;
+const toDays = (date) => toJulian(date) - J2000;
+const eclipticObliquity = degToRad(23.4397);
 
-const DAY_NIGHT_BAND_HEIGHT = 10;
-const DAY_NIGHT_BAND_GAP = 4;
-const DAY_NIGHT_LABEL_PADDING = DAY_NIGHT_BAND_HEIGHT + DAY_NIGHT_BAND_GAP + 6;
+const rightAscension = (l, b) =>
+  Math.atan2(
+    Math.sin(l) * Math.cos(eclipticObliquity) -
+      Math.tan(b) * Math.sin(eclipticObliquity),
+    Math.cos(l)
+  );
+
+const declination = (l, b) =>
+  Math.asin(
+    Math.sin(b) * Math.cos(eclipticObliquity) +
+      Math.cos(b) * Math.sin(eclipticObliquity) * Math.sin(l)
+  );
+
+const siderealTime = (d, lw) =>
+  degToRad(280.16 + 360.9856235 * d) - lw;
+
+const astroRefraction = (h) => {
+  if (h < 0) {
+    h = 0;
+  }
+  return 0.0002967 / Math.tan(h + 0.00312536 / (h + 0.08901179));
+};
+
+const moonCoords = (d) => {
+  const L = degToRad(218.316 + 13.176396 * d);
+  const M = degToRad(134.963 + 13.064993 * d);
+  const F = degToRad(93.272 + 13.229350 * d);
+
+  const l = L + degToRad(6.289) * Math.sin(M);
+  const b = degToRad(5.128) * Math.sin(F);
+  const dt = 385001 - 20905 * Math.cos(M);
+
+  return {
+    ra: rightAscension(l, b),
+    dec: declination(l, b),
+    dist: dt,
+  };
+};
+
+const EARTH_RADIUS_KM = 6378.14;
+const MOON_TIME_OFFSET_MIN = 5;
+
+const moonElevation = (date, lat, lon) => {
+  const adjusted = new Date(
+    date.getTime() + MOON_TIME_OFFSET_MIN * 60 * 1000
+  );
+  const d = toDays(adjusted);
+  const coords = moonCoords(d);
+  const lw = degToRad(-lon);
+  const phi = degToRad(lat);
+  const H = siderealTime(d, lw) - coords.ra;
+
+  let h = Math.asin(
+    Math.sin(phi) * Math.sin(coords.dec) +
+      Math.cos(phi) * Math.cos(coords.dec) * Math.cos(H)
+  );
+
+  // Parallax correction for topocentric altitude.
+  const parallax = Math.asin(EARTH_RADIUS_KM / coords.dist);
+  h = h - parallax * Math.cos(h);
+
+  h += astroRefraction(h);
+  return radToDeg(h);
+};
+
+const refineCrossing = (startMs, endMs, lat, lon, elevationFn) => {
+  let lo = startMs;
+  let hi = endMs;
+  let elevLo = elevationFn(new Date(lo), lat, lon);
+  let elevHi = elevationFn(new Date(hi), lat, lon);
+
+  if (!Number.isFinite(elevLo) || !Number.isFinite(elevHi)) {
+    return (startMs + endMs) / 2;
+  }
+
+  if (elevLo === 0) {
+    return lo;
+  }
+
+  if (elevHi === 0) {
+    return hi;
+  }
+
+  for (let i = 0; i < 24; i += 1) {
+    const mid = (lo + hi) / 2;
+    const elevMid = elevationFn(new Date(mid), lat, lon);
+    if (!Number.isFinite(elevMid)) {
+      break;
+    }
+    if (Math.sign(elevLo) === Math.sign(elevMid)) {
+      lo = mid;
+      elevLo = elevMid;
+    } else {
+      hi = mid;
+      elevHi = elevMid;
+    }
+  }
+
+  return (lo + hi) / 2;
+};
+
+const buildBandData = (timestamps, lat, lon, elevationFn, horizonDeg = 0) => {
+  const elevationAt = (date) => elevationFn(date, lat, lon) - horizonDeg;
+  const elevations = timestamps.map((iso) => elevationAt(new Date(iso)));
+  const crossings = [];
+
+  for (let i = 0; i < elevations.length - 1; i += 1) {
+    const elevA = elevations[i];
+    const elevB = elevations[i + 1];
+    if (!Number.isFinite(elevA) || !Number.isFinite(elevB)) {
+      crossings[i] = null;
+      continue;
+    }
+
+    if (elevA === 0) {
+      crossings[i] = 0;
+      continue;
+    }
+
+    if (elevB === 0) {
+      crossings[i] = 1;
+      continue;
+    }
+
+    if (Math.sign(elevA) !== Math.sign(elevB)) {
+      const startMs = Date.parse(timestamps[i]);
+      const endMs = Date.parse(timestamps[i + 1]);
+      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        const crossMs = refineCrossing(startMs, endMs, lat, lon, (d) =>
+          elevationAt(d)
+        );
+        crossings[i] = (crossMs - startMs) / (endMs - startMs);
+      } else {
+        crossings[i] = null;
+      }
+    } else {
+      crossings[i] = null;
+    }
+  }
+
+  return { elevations, crossings };
+};
+
+const BAND_HEIGHT = 10;
+const BAND_GAP = 4;
+const BAND_SPACING = 4;
+const BAND_LABEL_PADDING = BAND_GAP + BAND_HEIGHT * 2 + BAND_SPACING + 6;
 
 const dayNightBandPlugin = {
   id: "dayNightBand",
   beforeDatasetsDraw(chart, _args, options) {
     const xScale = chart.scales.x;
-    if (!xScale || !options?.segments?.length) {
+    const bands = options?.bands || [];
+    if (!xScale || !bands.length) {
       return;
     }
 
-    const ctx = chart.ctx;
-    const segments = options.segments;
     const labelCount = chart.data?.labels?.length || 0;
-    const count = Math.min(segments.length, labelCount);
-    if (!count) {
+    if (!labelCount) {
       return;
     }
 
     const centers = [];
-    for (let i = 0; i < count; i += 1) {
+    for (let i = 0; i < labelCount; i += 1) {
       centers.push(xScale.getPixelForValue(i));
     }
 
+    const ctx = chart.ctx;
+    const leftEdge = xScale.left;
+    const rightEdge = xScale.right;
+
+    const drawBand = (band) => {
+      const elevations = band.elevations || [];
+      const crossings = band.crossings || [];
+      const count = Math.min(elevations.length, labelCount);
+      if (!count) {
+        return;
+      }
+
+      const isUp = (elev) => elev > 0;
+      const baseY =
+        xScale.top + (options.gap ?? BAND_GAP) + (band.offset ?? 0);
+      const height = band.height ?? options.height ?? BAND_HEIGHT;
+      const upColor =
+        band.upColor || options.dayColor || "rgba(243, 201, 105, 0.7)";
+      const downColor =
+        band.downColor || options.nightColor || "rgba(94, 136, 214, 0.55)";
+
+      const drawSegment = (left, right, elev) => {
+        const width = Math.max(0, right - left);
+        if (width <= 0) {
+          return;
+        }
+        ctx.fillStyle = isUp(elev) ? upColor : downColor;
+        ctx.fillRect(left, baseY, width, height);
+      };
+
+      drawSegment(leftEdge, centers[0], elevations[0]);
+
+      for (let i = 0; i < count - 1; i += 1) {
+        const left = centers[i];
+        const right = centers[i + 1];
+        const elevLeft = elevations[i];
+        const elevRight = elevations[i + 1];
+        if (isUp(elevLeft) === isUp(elevRight) || elevLeft === elevRight) {
+          drawSegment(left, right, elevLeft);
+        } else {
+          let fraction = crossings[i];
+          if (!Number.isFinite(fraction)) {
+            const denom = elevLeft - elevRight;
+            fraction =
+              denom === 0 ? 0.5 : Math.min(Math.max(elevLeft / denom, 0), 1);
+          }
+          const cross = left + (right - left) * fraction;
+          drawSegment(left, cross, elevLeft);
+          drawSegment(cross, right, elevRight);
+        }
+      }
+
+      drawSegment(centers[count - 1], rightEdge, elevations[count - 1]);
+    };
+
     ctx.save();
     ctx.globalAlpha = 0.9;
-    for (let i = 0; i < count; i += 1) {
-      const left =
-        i === 0 ? xScale.left : (centers[i - 1] + centers[i]) / 2;
-      const right =
-        i === count - 1
-          ? xScale.right
-          : (centers[i] + centers[i + 1]) / 2;
-      const width = Math.max(0, right - left);
-      const y = xScale.top + (options.gap ?? DAY_NIGHT_BAND_GAP);
-      const height = options.height ?? DAY_NIGHT_BAND_HEIGHT;
-
-      ctx.fillStyle = segments[i]
-        ? options.dayColor || "rgba(243, 201, 105, 0.7)"
-        : options.nightColor || "rgba(94, 136, 214, 0.55)";
-      ctx.fillRect(left, y, width, height);
-    }
-
+    bands.forEach(drawBand);
     ctx.restore();
   },
 };
@@ -317,7 +566,8 @@ const buildBandChart = ({
   p10,
   p50,
   p90,
-  dayNightSegments,
+  dayNightBand,
+  moonBand,
   yLabel,
   yUnit,
   suggestedMin,
@@ -387,9 +637,24 @@ const buildBandChart = ({
           display: false,
         },
         dayNightBand: {
-          segments: dayNightSegments,
-          height: DAY_NIGHT_BAND_HEIGHT,
-          gap: DAY_NIGHT_BAND_GAP,
+          bands: [
+            {
+              elevations: dayNightBand.elevations,
+              crossings: dayNightBand.crossings,
+              upColor: "rgba(243, 201, 105, 0.7)",
+              downColor: "rgba(94, 136, 214, 0.55)",
+              offset: 0,
+            },
+            {
+              elevations: moonBand.elevations,
+              crossings: moonBand.crossings,
+              upColor: "rgba(180, 180, 190, 0.7)",
+              downColor: "rgba(70, 82, 110, 0.45)",
+              offset: BAND_HEIGHT + BAND_SPACING,
+            },
+          ],
+          height: BAND_HEIGHT,
+          gap: BAND_GAP,
         },
         tooltip: {
           callbacks: {
@@ -405,7 +670,7 @@ const buildBandChart = ({
             color: "#a2c4c4",
             maxRotation: 0,
             autoSkip: false,
-            padding: DAY_NIGHT_LABEL_PADDING,
+            padding: BAND_LABEL_PADDING,
             callback(value) {
               const label = this.getLabelForValue(value);
               return formatEvenHourTick(label);
@@ -555,7 +820,15 @@ const loadData = async () => {
     }
 
     const labels = timestamps;
-    const dayNightSegments = buildDayNightSegments(timestamps, lat, lon);
+    const dayNightBand = buildBandData(
+      timestamps,
+      lat,
+      lon,
+      solarElevation,
+      -0.833
+    );
+    const moonBand = buildBandData(timestamps, lat, lon, moonElevation, 0.133);
+    logBandDebug(timestamps, lat, lon, dayNightBand, moonBand);
 
     const cloudSeries = extractSeries(params, paramSets.cloud);
     const precipSeries = extractSeries(params, paramSets.precip);
@@ -579,7 +852,8 @@ const loadData = async () => {
       p10: p10Pct,
       p50: p50Pct,
       p90: p90Pct,
-      dayNightSegments,
+      dayNightBand,
+      moonBand,
       yLabel: "Cloud cover",
       yUnit: "%",
       suggestedMin: 0,
@@ -596,7 +870,8 @@ const loadData = async () => {
         p10: precipSeries.p10,
         p50: precipSeries.p50,
         p90: precipSeries.p90,
-        dayNightSegments,
+        dayNightBand,
+        moonBand,
         yLabel: "Precipitation",
         yUnit: "mm",
         suggestedMin: 0,
@@ -613,7 +888,8 @@ const loadData = async () => {
         p10: tempSeries.p10,
         p50: tempSeries.p50,
         p90: tempSeries.p90,
-        dayNightSegments,
+        dayNightBand,
+        moonBand,
         yLabel: "Temperature",
         yUnit: "deg C",
         formatValue: (value) => formatNumber(value, 1),
@@ -629,7 +905,8 @@ const loadData = async () => {
         p10: windSeries.p10,
         p50: windSeries.p50,
         p90: windSeries.p90,
-        dayNightSegments,
+        dayNightBand,
+        moonBand,
         yLabel: "Wind speed",
         yUnit: "m/s",
         suggestedMin: 0,
