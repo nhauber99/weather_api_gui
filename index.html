@@ -15,63 +15,40 @@
   <body>
     <div class="ambient"></div>
     <header class="hero">
-      <p class="eybrow">Geosphere ensemble forecast</p>
+      <p class="eyebrow">Geosphere ensemble forecast</p>
       <h1>Weather Predictions</h1>
-      <div class="meta">
-        <div>
-          <span class="label">Location</span>
-          <span class="value" id="locationLabel"></span>
-        </div>
-        <div>
-          <span class="label">Time zone</span>
-          <span class="value">Europe/Vienna</span>
-        </div>
-      </div>
-    </header>
-
-    <main class="layout">
-      <section class="card controls">
-        <div>
-          <h2>Controls</h2>
-          <p class="muted">
-            Data source: ensemble-v1-1h-2500m timeseries forecast.
-          </p>
-        </div>
-        <form id="cityForm" class="city-form">
-          <label>
-            City (Austria)
-            <input
-              type="text"
-              id="cityInput"
-              placeholder="e.g., Linz"
-              autocomplete="off"
-            />
-          </label>
-          <button type="submit">Search city</button>
-        </form>
-        <div class="city-status" id="cityStatus">Type a city to search.</div>
-        <ul class="city-results" id="cityResults"></ul>
-
-        <form id="locationForm">
-          <label>
-            Latitude
-            <input type="number" id="latInput" step="0.0001" value="47.918608" />
-          </label>
-          <label>
-            Longitude
-            <input type="number" id="lonInput" step="0.0001" value="13.802306" />
-          </label>
-          <button type="submit">Update forecast</button>
-        </form>
-        <div class="status" id="status">Loading metadata...</div>
-        <div class="details">
+      <div class="topbar">
+        <div class="topbar-info">
+          <div>
+            <span class="label">Location</span>
+            <span class="value" id="locationLabel"></span>
+          </div>
+          <div>
+            <span class="label">Coordinates</span>
+            <span class="value" id="coordLabel">—</span>
+          </div>
           <div>
             <span class="label">Reference time</span>
             <span class="value" id="refTime">N/A</span>
           </div>
         </div>
-      </section>
+        <div class="search-area">
+          <form id="cityForm" class="search-form">
+            <input
+              type="text"
+              id="cityInput"
+              placeholder="Search Austrian city"
+              autocomplete="off"
+            />
+            <button type="submit">Search</button>
+          </form>
+          <div class="city-status" id="cityStatus">Type a city to search.</div>
+          <ul class="city-results" id="cityResults"></ul>
+        </div>
+      </div>
+    </header>
 
+    <main class="layout">
       <div class="charts">
         <section class="card chart-card">
           <div class="chart-header">

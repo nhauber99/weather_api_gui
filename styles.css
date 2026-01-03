@@ -56,27 +56,38 @@ p {
   margin-bottom: 0.75rem;
 }
 
+h1 {
+  margin-bottom: 1.2rem;
+}
+
 .lede {
   max-width: 600px;
   font-size: 1.05rem;
   color: var(--muted);
 }
 
-.meta {
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.6rem;
+}
+
+.topbar-info {
   display: flex;
   gap: 2rem;
   flex-wrap: wrap;
-  margin-top: 1.5rem;
 }
 
-.meta .label {
+.topbar .label {
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   color: var(--muted);
 }
 
-.meta .value {
+.topbar .value {
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -84,9 +95,7 @@ p {
 .layout {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
-  gap: 1.6rem;
+  display: block;
   padding: 0 4vw 3rem;
   max-width: 1500px;
   margin: 0 auto;
@@ -102,19 +111,22 @@ p {
   animation: fadeUp 0.8s ease both;
 }
 
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
 form {
   display: grid;
   gap: 1rem;
 }
 
-.city-form {
-  margin-bottom: 0.5rem;
+.search-area {
+  position: relative;
+  min-width: 280px;
+  max-width: 360px;
+  margin-left: auto;
+  z-index: 6;
+}
+
+.search-form {
+  grid-template-columns: 1fr auto;
+  align-items: center;
 }
 
 .city-status {
@@ -123,11 +135,25 @@ form {
 }
 
 .city-results {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0.4rem;
   display: grid;
   gap: 0.6rem;
+  border-radius: 14px;
+  border: 1px solid rgba(94, 214, 200, 0.2);
+  background: rgba(9, 20, 22, 0.92);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 5;
+}
+
+.city-results:empty {
+  display: none;
 }
 
 .city-results button {
@@ -146,13 +172,6 @@ form {
 .city-results button:hover {
   border-color: rgba(94, 214, 200, 0.5);
   transform: translateY(-1px);
-}
-
-label {
-  display: grid;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  color: var(--muted);
 }
 
 input {
@@ -178,32 +197,6 @@ button {
 button:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px -12px rgba(94, 214, 200, 0.6);
-}
-
-.status {
-  padding: 0.6rem 0.9rem;
-  border-radius: 12px;
-  background: rgba(94, 214, 200, 0.08);
-  border: 1px solid rgba(94, 214, 200, 0.2);
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.details {
-  display: grid;
-  gap: 0.8rem;
-}
-
-.details .label {
-  text-transform: uppercase;
-  font-size: 0.68rem;
-  letter-spacing: 0.15em;
-  color: var(--muted);
-}
-
-.details .value {
-  font-weight: 600;
-  font-size: 0.95rem;
 }
 
 .charts {
@@ -253,8 +246,14 @@ button:hover {
 }
 
 @media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-area {
+    width: 100%;
+    max-width: none;
   }
 }
 

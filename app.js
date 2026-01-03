@@ -6,16 +6,16 @@ const cloudCanvas = document.getElementById("cloudChart");
 const precipCanvas = document.getElementById("precipChart");
 const tempCanvas = document.getElementById("tempChart");
 const windCanvas = document.getElementById("windChart");
-const form = document.getElementById("locationForm");
 const cityForm = document.getElementById("cityForm");
 const cityInput = document.getElementById("cityInput");
 const cityResults = document.getElementById("cityResults");
 const cityStatus = document.getElementById("cityStatus");
-const latInput = document.getElementById("latInput");
-const lonInput = document.getElementById("lonInput");
-const statusEl = document.getElementById("status");
 const refTimeEl = document.getElementById("refTime");
 const locationLabelEl = document.getElementById("locationLabel");
+const coordLabelEl = document.getElementById("coordLabel");
+
+const DEFAULT_LAT = 47.918608;
+const DEFAULT_LON = 13.802306;
 
 let charts = {
   cloud: null,
@@ -26,6 +26,11 @@ let charts = {
 let paramSets = null;
 let lastCitySearch = 0;
 let currentLocationName = "Traun";
+let currentLat = DEFAULT_LAT;
+let currentLon = DEFAULT_LON;
+let cachedResults = [];
+let cachedQuery = "";
+let searchTimer = null;
 
 const formatTime = (iso) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -435,16 +440,6 @@ const dayNightBandPlugin = {
   },
 };
 
-const setStatus = (text, isError = false) => {
-  statusEl.textContent = text;
-  statusEl.style.borderColor = isError
-    ? "rgba(255, 125, 125, 0.4)"
-    : "rgba(94, 214, 200, 0.2)";
-  statusEl.style.background = isError
-    ? "rgba(255, 125, 125, 0.08)"
-    : "rgba(94, 214, 200, 0.08)";
-};
-
 const setCityStatus = (text, isError = false) => {
   cityStatus.textContent = text;
   cityStatus.style.color = isError ? "#ffb4b4" : "var(--muted)";
@@ -454,12 +449,33 @@ const clearCityResults = () => {
   cityResults.innerHTML = "";
 };
 
+const applyCityResult = (result) => {
+  const lat = parseFloat(result.lat);
+  const lon = parseFloat(result.lon);
+  const labelParts = (result.display_name || "").split(",").slice(0, 4);
+  const label = labelParts.join(", ").trim() || "Unnamed location";
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return;
+  }
+
+  currentLocationName = label;
+  cityInput.value = label;
+  currentLat = lat;
+  currentLon = lon;
+  locationLabelEl.textContent = label;
+  if (coordLabelEl) {
+    coordLabelEl.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  }
+  setCityStatus("Location selected.");
+  clearCityResults();
+  loadData();
+};
+
 const renderCityResults = (results) => {
   clearCityResults();
 
   results.forEach((result) => {
-    const lat = parseFloat(result.lat);
-    const lon = parseFloat(result.lon);
     const labelParts = (result.display_name || "").split(",").slice(0, 4);
     const label = labelParts.join(", ").trim() || "Unnamed location";
 
@@ -468,13 +484,7 @@ const renderCityResults = (results) => {
     button.type = "button";
     button.textContent = label;
     button.addEventListener("click", () => {
-      latInput.value = lat.toFixed(6);
-      lonInput.value = lon.toFixed(6);
-      currentLocationName = label;
-      cityInput.value = label;
-      locationLabelEl.textContent = `${label} (${lat.toFixed(6)}, ${lon.toFixed(6)})`;
-      setCityStatus("Location selected.");
-      loadData();
+      applyCityResult(result);
     });
 
     li.appendChild(button);
@@ -482,7 +492,7 @@ const renderCityResults = (results) => {
   });
 };
 
-const searchCity = async () => {
+const searchCity = async ({ selectFirst = false } = {}) => {
   const query = cityInput.value.trim();
 
   if (!query) {
@@ -490,9 +500,27 @@ const searchCity = async () => {
     return;
   }
 
+  if (query === cachedQuery && cachedResults.length) {
+    if (selectFirst) {
+      applyCityResult(cachedResults[0]);
+      return;
+    }
+    setCityStatus(
+      `Found ${cachedResults.length} match${cachedResults.length === 1 ? "" : "es"}.`
+    );
+    renderCityResults(cachedResults);
+    return;
+  }
+
   const now = Date.now();
   if (now - lastCitySearch < 900) {
-    setCityStatus("Please wait a moment before searching again.", true);
+    setCityStatus("Searching...");
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+    }
+    searchTimer = setTimeout(() => {
+      searchCity({ selectFirst });
+    }, 300);
     return;
   }
 
@@ -523,7 +551,14 @@ const searchCity = async () => {
       return;
     }
 
+    cachedResults = results;
+    cachedQuery = query;
+
     setCityStatus(`Found ${results.length} match${results.length === 1 ? "" : "es"}.`);
+    if (selectFirst) {
+      applyCityResult(results[0]);
+      return;
+    }
     renderCityResults(results);
   } catch (error) {
     console.error(error);
@@ -797,17 +832,15 @@ const fetchForecast = async (lat, lon) => {
 };
 
 const loadData = async () => {
-  const lat = parseFloat(latInput.value);
-  const lon = parseFloat(lonInput.value);
+  const lat = currentLat;
+  const lon = currentLon;
 
-  if (Number.isNaN(lat) || Number.isNaN(lon)) {
-    setStatus("Enter a valid latitude and longitude.", true);
-    return;
-  }
-
-  setStatus("Fetching forecast...");
+  setCityStatus("Fetching forecast...");
   const locationName = currentLocationName || "Traun";
-  locationLabelEl.textContent = `${locationName} (${lat.toFixed(6)}, ${lon.toFixed(6)})`;
+  locationLabelEl.textContent = locationName;
+  if (coordLabelEl) {
+    coordLabelEl.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  }
 
   try {
     const data = await fetchForecast(lat, lon);
@@ -918,15 +951,19 @@ const loadData = async () => {
       ? formatTime(data.reference_time)
       : "N/A";
 
-    setStatus("Updated just now.");
+    setCityStatus("Updated just now.");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Unable to load forecast.", true);
+    setCityStatus(error.message || "Unable to load forecast.", true);
   }
 };
 
 const init = async () => {
   try {
+    locationLabelEl.textContent = currentLocationName;
+    if (coordLabelEl) {
+      coordLabelEl.textContent = `${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
+    }
     const metadataResponse = await fetch(
       `${API_BASE}/timeseries/forecast/${DATASET_ID}/metadata`,
       { cache: "no-store" }
@@ -958,30 +995,34 @@ const init = async () => {
 
     paramSets = { cloud, precip, temp, windU, windV };
 
-    setStatus("Metadata loaded.");
+    setCityStatus("Metadata loaded.");
     await loadData();
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Unable to initialize.", true);
+    setCityStatus(error.message || "Unable to initialize.", true);
   }
 };
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  loadData();
-});
-
-latInput.addEventListener("input", () => {
-  currentLocationName = "Custom location";
-});
-
-lonInput.addEventListener("input", () => {
-  currentLocationName = "Custom location";
-});
-
 cityForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  searchCity();
+  searchCity({ selectFirst: true });
+});
+
+cityInput.addEventListener("input", () => {
+  const query = cityInput.value.trim();
+  cachedQuery = "";
+  cachedResults = [];
+  clearCityResults();
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+  }
+  if (!query || query.length < 2) {
+    setCityStatus("Type a city to search.");
+    return;
+  }
+  searchTimer = setTimeout(() => {
+    searchCity();
+  }, 350);
 });
 
 init();
