@@ -428,6 +428,35 @@ button:hover {
   margin: 0 auto;
   color: var(--muted);
   font-size: 0.85rem;
+  border-top: 1px solid rgba(94, 214, 200, 0.2);
+}
+
+.footer-title {
+  font-family: "Fraunces", serif;
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
+.footer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.footer-list li {
+  line-height: 1.5;
+}
+
+.footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
 }
 
 @keyframes fadeUp {
