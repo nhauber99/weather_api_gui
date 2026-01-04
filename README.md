@@ -1,6 +1,8 @@
-﻿# Weather Viewer (Traun, AT)
+This is essentially vibe coded and the code quality will most likely be atrocious. I'm only making this public so I can host it as a github page and access it from everywhere - there is no value in the code. This page is just for querying multiple weather APIs and displaying their results which I use for astrophotography.
+ 
+ # Weather Viewer
 
-Static site for visualizing Geosphere Austria ensemble forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with NWP, Open-Meteo, Meteosource, OpenWeather, and Meteoblue overlays on all charts. Includes day/night and moonrise/moonset bands under the x-axis.
+Static site for visualizing forecasts (cloud cover, precipitation, temperature, wind) for Austrian cities, with Geosphere, Open-Meteo, Meteosource, OpenWeather, and Meteoblue overlays on all charts. Includes day/night and moonrise/moonset bands under the x-axis.
 
 ## Local run
 
