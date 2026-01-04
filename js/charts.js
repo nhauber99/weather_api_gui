@@ -1,10 +1,10 @@
 import { formatTime, formatEvenHourTick, getLocalHour } from "./format.js";
 import { ENSEMBLE_STYLE, PROVIDER_STYLES } from "./theme.js";
 
-const BAND_HEIGHT = 10;
-const BAND_GAP = 4;
-const BAND_SPACING = 4;
-const BAND_LABEL_PADDING = BAND_GAP + BAND_HEIGHT * 2 + BAND_SPACING + 6;
+const BAND_HEIGHT = 8;
+const BAND_GAP = 3;
+const BAND_SPACING = 3;
+const BAND_LABEL_PADDING = BAND_GAP + BAND_HEIGHT * 2 + BAND_SPACING + 2;
 
 const dayNightBandPlugin = {
   id: "dayNightBand",
@@ -116,6 +116,11 @@ const midnightLinePlugin = {
   },
 };
 
+const isMobilePortrait = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(max-width: 700px) and (orientation: portrait)").matches;
+
 const toRgba = (color, alpha) => {
   if (!color) {
     return `rgba(255, 255, 255, ${alpha})`;
@@ -215,6 +220,14 @@ export const createChartBuilder = () => {
     wind: null,
   };
 
+  const resizeAll = () => {
+    Object.values(charts).forEach((chart) => {
+      if (chart) {
+        chart.resize();
+      }
+    });
+  };
+
   const buildBandChart = ({
     canvas,
     chartKey,
@@ -224,8 +237,6 @@ export const createChartBuilder = () => {
     p90,
     dayNightBand,
     moonBand,
-    yLabel,
-    yUnit,
     suggestedMin,
     suggestedMax,
     formatValue,
@@ -301,7 +312,6 @@ export const createChartBuilder = () => {
       });
     }
 
-    const unitSuffix = yUnit ? ` (${yUnit})` : "";
     const valueFormatter = formatValue || ((value) => value);
 
     charts[chartKey] = new Chart(ctx, {
@@ -314,6 +324,15 @@ export const createChartBuilder = () => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
+        layout: {
+          padding: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          },
+        },
         interaction: {
           mode: "index",
           intersect: false,
@@ -363,6 +382,13 @@ export const createChartBuilder = () => {
               padding: BAND_LABEL_PADDING,
               callback(value) {
                 const label = this.getLabelForValue(value);
+                if (isMobilePortrait()) {
+                  const hour = getLocalHour(label);
+                  if (!Number.isFinite(hour) || hour % 4 !== 0) {
+                    return "";
+                  }
+                  return String(hour).padStart(2, "0");
+                }
                 return formatEvenHourTick(label);
               },
             },
@@ -372,16 +398,12 @@ export const createChartBuilder = () => {
           },
           y: {
             title: {
-              display: true,
-              text: `${yLabel}${unitSuffix}`,
-              color: "#a2c4c4",
-              font: {
-                family: "Space Grotesk",
-              },
+              display: false,
             },
             ticks: {
               color: "#a2c4c4",
               callback: (value) => valueFormatter(value),
+              padding: 4,
             },
             suggestedMin,
             suggestedMax,
@@ -394,9 +416,5 @@ export const createChartBuilder = () => {
     });
   };
 
-  return { buildBandChart };
+  return { buildBandChart, resizeAll };
 };
-
-
-
-

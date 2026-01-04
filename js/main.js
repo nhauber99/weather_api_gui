@@ -77,7 +77,18 @@ const logCache = (message, data) => {
   }
 };
 
-const { buildBandChart } = createChartBuilder();
+const { buildBandChart, resizeAll } = createChartBuilder();
+let resizeFrame = null;
+
+window.addEventListener("resize", () => {
+  if (resizeFrame) {
+    cancelAnimationFrame(resizeFrame);
+  }
+  resizeFrame = requestAnimationFrame(() => {
+    resizeAll();
+    resizeFrame = null;
+  });
+});
 
 if (viewToggle) {
   viewToggle.addEventListener("change", () => {
@@ -443,7 +454,6 @@ const renderCharts = (state) => {
     dayNightBand,
     moonBand,
     yLabel: "Cloud cover",
-    yUnit: "%",
     suggestedMin: 0,
     suggestedMax: 100,
     formatValue: (value) => `${formatNumber(value, 0)}%`,
@@ -463,7 +473,6 @@ const renderCharts = (state) => {
       dayNightBand,
       moonBand,
       yLabel: "Precipitation",
-      yUnit: "mm",
       suggestedMin: 0,
       suggestedMax: precipMax ? Math.max(1, precipMax) : 1,
       formatValue: (value) => formatNumber(value, 2),
@@ -484,7 +493,6 @@ const renderCharts = (state) => {
       dayNightBand,
       moonBand,
       yLabel: "Temperature",
-      yUnit: "deg C",
       formatValue: (value) => formatNumber(value, 1),
       overlays: overlaysFor("temp"),
       simpleSeries: simpleSeries.temp,
@@ -503,7 +511,6 @@ const renderCharts = (state) => {
       dayNightBand,
       moonBand,
       yLabel: "Wind speed",
-      yUnit: "m/s",
       suggestedMin: 0,
       suggestedMax: windMax ? Math.max(5, windMax) : 5,
       formatValue: (value) => formatNumber(value, 1),

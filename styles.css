@@ -50,14 +50,15 @@ p {
 
 .eyebrow {
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   letter-spacing: 0.2em;
   color: var(--sun);
   margin-bottom: 0.75rem;
 }
 
 h1 {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.4rem;
+  font-size: clamp(2.1rem, 4vw, 3.1rem);
 }
 
 .lede {
@@ -80,6 +81,7 @@ h1 {
   display: flex;
   gap: 2rem;
   flex-wrap: wrap;
+  padding-top: 0.35rem;
 }
 
 .topbar-actions {
@@ -99,7 +101,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.7rem;
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: var(--muted);
 }
 
@@ -146,14 +148,14 @@ h1 {
 
 .topbar .label {
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   letter-spacing: 0.12em;
   color: var(--muted);
 }
 
 .topbar .value {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
 }
 
 .layout {
@@ -194,7 +196,7 @@ form {
 }
 
 .city-status {
-  font-size: 0.82rem;
+  font-size: 1rem;
   color: var(--muted);
 }
 
@@ -256,6 +258,7 @@ button {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-size: 1rem;
 }
 
 button:hover {
@@ -279,6 +282,7 @@ button:hover {
 .keys-button {
   align-self: flex-start;
   padding: 0.55rem 0.9rem;
+  font-size: 1rem;
 }
 
 .keys-panel {
@@ -299,7 +303,7 @@ button:hover {
 }
 
 .key-field input {
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .key-actions {
@@ -382,22 +386,33 @@ button:hover {
 
 .charts {
   display: grid;
-  gap: 1.6rem;
+  gap: 1rem;
 }
 
 .chart-card {
+  padding: 15px;
   min-height: 0;
 }
 
 .chart-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
 
 .chart-wrap {
   background: rgba(7, 17, 18, 0.4);
   border-radius: 16px;
-  padding: 1rem;
+  padding: 0.4rem;
   border: 1px solid rgba(94, 214, 200, 0.12);
+  overflow: hidden;
+  height: var(--chart-height, 240px);
+}
+
+.chart-wrap canvas {
+  display: block;
+  width: calc(100% + 20px);
+  height: 100%;
+  margin-bottom: -20px;
+  margin-right: -20px;
 }
 
 .muted {
@@ -435,6 +450,88 @@ button:hover {
   .search-area {
     width: 100%;
     max-width: none;
+  }
+
+  .topbar-actions {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    padding: 2rem 2.8vw 1rem;
+  }
+
+  .eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+  }
+
+  h1 {
+    font-size: clamp(1.85rem, 6.5vw, 2.4rem);
+  }
+
+  .topbar-info {
+    gap: 1rem;
+  }
+
+  .chart-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .search-form {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .icon-button {
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .layout {
+    padding: 0 2.8vw 2.2rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .chart-wrap {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .hero {
+    padding: 1.7rem 2.2vw 0.9rem;
+  }
+
+  .layout {
+    padding: 0 2.2vw 2rem;
+  }
+
+  .card {
+    padding: 0.85rem;
+  }
+
+  .chart-wrap {
+    padding: 0.4rem;
+  }
+
+  .chart-header h2 {
+    font-size: 0.98rem;
+  }
+
+  .topbar .label {
+    font-size: 0.65rem;
+  }
+
+  .topbar .value {
+    font-size: 0.9rem;
+  }
+
+  .city-status {
+    font-size: 1rem;
   }
 }
 
