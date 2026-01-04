@@ -6,7 +6,7 @@ import {
   METEOBLUE_BASE,
   TIMEZONE,
 } from "./config.js";
-import { METEOSOURCE_KEY, OPENWEATHER_KEY, METEOBLUE_KEY } from "./keys.js";
+import { getApiKey } from "./keys.js";
 
 export const buildParamIndex = (metadata) => {
   if (!metadata?.parameters?.length) {
@@ -211,7 +211,8 @@ const toNumber = (value) => {
 };
 
 export const fetchMeteosource = async (lat, lon) => {
-  if (!METEOSOURCE_KEY) {
+  const key = getApiKey("meteosource");
+  if (!key) {
     return null;
   }
 
@@ -222,7 +223,7 @@ export const fetchMeteosource = async (lat, lon) => {
     timezone: TIMEZONE,
     language: "en",
     units: "metric",
-    key: METEOSOURCE_KEY,
+    key,
   });
 
   const response = await fetch(`${METEOSOURCE_BASE}?${query.toString()}`);
@@ -252,7 +253,8 @@ export const parseMeteosourceHourly = (meteosourceData) => {
 };
 
 export const fetchOpenWeather = async (lat, lon) => {
-  if (!OPENWEATHER_KEY) {
+  const key = getApiKey("openweather");
+  if (!key) {
     return null;
   }
 
@@ -260,7 +262,7 @@ export const fetchOpenWeather = async (lat, lon) => {
     lat: lat.toString(),
     lon: lon.toString(),
     units: "metric",
-    appid: OPENWEATHER_KEY,
+    appid: key,
   });
 
   const response = await fetch(`${OPENWEATHER_BASE}?${query.toString()}`);
@@ -409,14 +411,15 @@ const toMeteoblueHourKey = (timeValue) => {
 };
 
 export const fetchMeteoblue = async (lat, lon) => {
-  if (!METEOBLUE_KEY) {
+  const key = getApiKey("meteoblue");
+  if (!key) {
     return null;
   }
 
   const query = new URLSearchParams({
     lat: lat.toString(),
     lon: lon.toString(),
-    apikey: METEOBLUE_KEY,
+    apikey: key,
     tz: TIMEZONE,
     temperature: "C",
     windspeed: "ms-1",

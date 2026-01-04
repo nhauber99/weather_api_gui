@@ -28,15 +28,20 @@
             <span class="value" id="coordLabel">N/A</span>
           </div>
         </div>
-        <div class="view-toggle">
-          <div class="toggle-row">
-            <span>All</span>
-            <label class="switch" for="viewToggle">
-              <input type="checkbox" id="viewToggle" />
-              <span class="slider"></span>
-            </label>
-            <span>Simple</span>
+        <div class="topbar-actions">
+          <div class="view-toggle">
+            <div class="toggle-row">
+              <span>All</span>
+              <label class="switch" for="viewToggle">
+                <input type="checkbox" id="viewToggle" />
+                <span class="slider"></span>
+              </label>
+              <span>Simple</span>
+            </div>
           </div>
+          <button type="button" id="keysToggle" class="ghost keys-button">
+            API Keys
+          </button>
         </div>
         <div class="search-area">
           <form id="cityForm" class="search-form">
@@ -47,6 +52,25 @@
               autocomplete="off"
             />
             <button type="submit">Search</button>
+            <button type="button" id="refreshButton" class="icon-button" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M20 12a8 8 0 1 1-2.35-5.65"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M20 4v6h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
           </form>
           <div class="city-status" id="cityStatus">Type a city to search.</div>
           <ul class="city-results" id="cityResults"></ul>
@@ -93,6 +117,44 @@
         </section>
       </div>
     </main>
+
+    <div class="modal" id="keysModal" hidden>
+      <div class="modal-backdrop" id="keysBackdrop"></div>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>API Keys</h3>
+          <button type="button" id="keysClose" class="ghost icon-button" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="keys-panel">
+          <label class="key-field">
+            <span>Meteosource</span>
+            <input type="text" id="keyMeteosource" placeholder="Enter key" />
+          </label>
+          <label class="key-field">
+            <span>OpenWeather</span>
+            <input type="text" id="keyOpenWeather" placeholder="Enter key" />
+          </label>
+          <label class="key-field">
+            <span>Meteoblue</span>
+            <input type="text" id="keyMeteoblue" placeholder="Enter key" />
+          </label>
+          <div class="key-actions">
+            <button type="button" id="keysSave">Save keys</button>
+          </div>
+          <div class="key-hint">Stored locally in your browser.</div>
+        </div>
+      </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script type="module" src="js/main.js"></script>

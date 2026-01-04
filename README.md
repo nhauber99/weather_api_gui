@@ -28,7 +28,7 @@ Then open `http://localhost:8000`.
 
 - The search box uses OpenStreetMap Nominatim (Austria only).
 - Moonrise/set uses a small time offset (`MOON_TIME_OFFSET_MIN` in `js/config.js`) to match observed timings.
-- Meteosource, OpenWeather, and Meteoblue keys live in `js/keys.js` (ignored via `.gitignore`).
+- API keys are stored in your browser localStorage (edit via the "API Keys" panel in the UI).
 - Overlay providers are optional; if a provider fails the charts still render with available data.
 
 ## Quick tweaks
